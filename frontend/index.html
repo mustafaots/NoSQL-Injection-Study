@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Notes Portal - Your Digital Study Companion</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="index.html" class="navbar-brand">
+                <i class="fa-solid fa-book-open"></i>
+                <span>TrackNotes</span>
+            </a>
+            <ul class="navbar-nav">
+                <li><a href="index.html" class="active">Home</a></li>
+                <li><a href="login.html" class="btn btn-secondary btn-sm">Login</a></li>
+                <li><a href="signup.html" class="btn btn-primary btn-sm">Sign Up</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-text">
+                    <h1>Your <span>Digital Study</span> Companion</h1>
+                    <p>Organize your thoughts, capture ideas, and never lose track of important information. 
+                       TrackNotes helps students stay organized and focused on what matters most - learning.</p>
+                    <div class="hero-buttons">
+                        <a href="signup.html" class="btn btn-primary btn-lg">Get Started Free</a>
+                        <a href="login.html" class="btn btn-secondary btn-lg">Sign In</a>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="carousel">
+                        <div class="carousel-inner">
+                            <div class="carousel-slide active">
+                                <img src="assets/notes1.jpg" alt="Student taking notes">
+                            </div>
+                            <div class="carousel-slide">
+                                <img src="assets/notes2.png" alt="Organized study notes">
+                            </div>
+                            <div class="carousel-slide">
+                                <img src="assets/notes3.png" alt="Digital note-taking">
+                            </div>
+                        </div>
+                        <div class="carousel-indicators">
+                            <button class="indicator active" data-slide="0"></button>
+                            <button class="indicator" data-slide="1"></button>
+                            <button class="indicator" data-slide="2"></button>
+                        </div>
+                        <button class="carousel-btn prev" aria-label="Previous slide">
+                            <i class="fa-solid fa-chevron-left"></i>
+                        </button>
+                        <button class="carousel-btn next" aria-label="Next slide">
+                            <i class="fa-solid fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Why Choose TrackNotes?</h2>
+                <p>Everything you need to stay organized and excel in your studies</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card card">
+                    <div class="feature-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+                    <h3>Easy Note Taking</h3>
+                    <p>Create and organize notes quickly with our intuitive interface. Focus on learning, not on figuring out how to use the app.</p>
+                </div>
+                <div class="feature-card card">
+                    <div class="feature-icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+                    <h3>Quick Search</h3>
+                    <p>Find any note in seconds with powerful search functionality. Never lose track of important information again.</p>
+                </div>
+                <div class="feature-card card">
+                    <div class="feature-icon"><i class="fa-solid fa-lock"></i></div>
+                    <h3>Secure Storage</h3>
+                    <p>Your notes are safely stored and accessible only to you. Study with peace of mind knowing your data is protected.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <p>&copy; 2026 TrackNotes. All rights reserved.</p>
+                <div class="footer-links">
+                    <a href="#">Privacy Policy</a>
+                    <a href="#">Terms of Service</a>
+                    <a href="#">Contact</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script>
+        // Carousel functionality
+        const slides = document.querySelectorAll('.carousel-slide');
+        const indicators = document.querySelectorAll('.indicator');
+        const prevBtn = document.querySelector('.carousel-btn.prev');
+        const nextBtn = document.querySelector('.carousel-btn.next');
+        let currentSlide = 0;
+        let autoSlideInterval;
+
+        function showSlide(index) {
+            // Handle wrap-around
+            if (index >= slides.length) index = 0;
+            if (index < 0) index = slides.length - 1;
+            
+            currentSlide = index;
+
+            // Update slides
+            slides.forEach((slide, i) => {
+                slide.classList.toggle('active', i === index);
+            });
+
+            // Update indicators
+            indicators.forEach((indicator, i) => {
+                indicator.classList.toggle('active', i === index);
+            });
+        }
+
+        function nextSlide() {
+            showSlide(currentSlide + 1);
+        }
+
+        function prevSlide() {
+            showSlide(currentSlide - 1);
+        }
+
+        // Event listeners
+        prevBtn.addEventListener('click', () => {
+            prevSlide();
+            resetAutoSlide();
+        });
+
+        nextBtn.addEventListener('click', () => {
+            nextSlide();
+            resetAutoSlide();
+        });
+
+        indicators.forEach((indicator, index) => {
+            indicator.addEventListener('click', () => {
+                showSlide(index);
+                resetAutoSlide();
+            });
+        });
+
+        // Auto-slide functionality
+        function startAutoSlide() {
+            autoSlideInterval = setInterval(nextSlide, 4000);
+        }
+
+        function resetAutoSlide() {
+            clearInterval(autoSlideInterval);
+            startAutoSlide();
+        }
+
+        // Start auto-sliding
+        startAutoSlide();
+    </script>
+</body>
+</html>

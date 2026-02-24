@@ -1,0 +1,7 @@
+{
+  "_id": ObjectId,
+  "userId": ObjectId,
+  "token": String,
+  "expiresAt": Date,
+  "createdAt": Date
+}

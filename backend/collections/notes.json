@@ -1,0 +1,8 @@
+{
+  "_id": ObjectId,
+  "userId": ObjectId,          // references users._id
+  "title": String,
+  "content": String,
+  "createdAt": Date,
+  "updatedAt": Date
+}

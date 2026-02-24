@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up - Student Notes Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Home</a>
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo"><i class="fa-solid fa-book-open"></i></div>
+                <h1>Create Account</h1>
+                <p>Start organizing your notes today</p>
+            </div>
+            <div class="auth-body">
+                <!-- Alert placeholders -->
+                <div id="alertBox" class="alert hidden">
+                    <i id="alertIcon" class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="alertMessage"></span>
+                </div>
+
+                <form id="signupForm" action="/api/auth/signup" method="POST">
+                    <div class="form-group">
+                        <label for="username" class="form-label">Username</label>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-input" 
+                            placeholder="Choose a username"
+                            required
+                            minlength="3"
+                            maxlength="20"
+                            autocomplete="username"
+                        >
+                        <p class="form-hint">3-20 characters, letters and numbers only</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="password" class="form-label">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="Create a password"
+                            required
+                            minlength="6"
+                            autocomplete="new-password"
+                        >
+                        <p class="form-hint">Minimum 6 characters</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword" class="form-label">Confirm Password</label>
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            name="confirmPassword" 
+                            class="form-input" 
+                            placeholder="Confirm your password"
+                            required
+                            autocomplete="new-password"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg">
+                        Create Account
+                    </button>
+                </form>
+            </div>
+            <div class="auth-footer">
+                <p>Already have an account? <a href="login.html">Sign in</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const alertBox = document.getElementById('alertBox');
+            const alertIcon = document.getElementById('alertIcon');
+            const alertMessage = document.getElementById('alertMessage');
+
+            // Hide any previous alerts
+            alertBox.classList.add('hidden');
+            alertBox.classList.remove('alert-danger', 'alert-success');
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                alertBox.classList.add('alert-danger');
+                alertIcon.className = 'fa-solid fa-triangle-exclamation';
+                alertMessage.textContent = 'Passwords do not match';
+                alertBox.classList.remove('hidden');
+                return;
+            }
+
+            // Validate username format
+            if (!/^[a-zA-Z0-9]+$/.test(username)) {
+                alertBox.classList.add('alert-danger');
+                alertIcon.className = 'fa-solid fa-triangle-exclamation';
+                alertMessage.textContent = 'Username can only contain letters and numbers';
+                alertBox.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/signup', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Show success message
+                    alertBox.classList.add('alert-success');
+                    alertIcon.className = 'fa-solid fa-circle-check';
+                    alertMessage.textContent = 'Account created successfully! Redirecting...';
+                    alertBox.classList.remove('hidden');
+                    
+                    // Redirect to login page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    // Show error message
+                    alertBox.classList.add('alert-danger');
+                    alertIcon.className = 'fa-solid fa-triangle-exclamation';
+                    alertMessage.textContent = data.message || 'Failed to create account';
+                    alertBox.classList.remove('hidden');
+                }
+            } catch (error) {
+                alertBox.classList.add('alert-danger');
+                alertIcon.className = 'fa-solid fa-triangle-exclamation';
+                alertMessage.textContent = 'An error occurred. Please try again.';
+                alertBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

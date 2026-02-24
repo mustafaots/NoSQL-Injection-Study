@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Student Notes Portal</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="auth-container">
+        <a href="index.html" class="back-link"><i class="fa-solid fa-arrow-left"></i> Back to Home</a>
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo"><i class="fa-solid fa-book-open"></i></div>
+                <h1>Welcome Back!</h1>
+                <p>Sign in to access your notes</p>
+            </div>
+            <div class="auth-body">
+                <!-- Alert placeholder for error messages -->
+                <div id="alertBox" class="alert alert-danger hidden">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="alertMessage">Invalid username or password</span>
+                </div>
+
+                <form id="loginForm" action="/api/auth/login" method="POST">
+                    <div class="form-group">
+                        <label for="username" class="form-label">Username</label>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-input" 
+                            placeholder="Enter your username"
+                            required
+                            autocomplete="username"
+                        >
+                    </div>
+                    <div class="form-group">
+                        <label for="password" class="form-label">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="Enter your password"
+                            required
+                            autocomplete="current-password"
+                        >
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-block btn-lg">
+                        Sign In
+                    </button>
+                </form>
+            </div>
+            <div class="auth-footer">
+                <p>Don't have an account? <a href="signup.html">Create one</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Demo account credentials
+        const DEMO_ACCOUNT = {
+            username: 'demo',
+            password: 'demo123'
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const alertBox = document.getElementById('alertBox');
+            const alertMessage = document.getElementById('alertMessage');
+
+            // Hide any previous alerts
+            alertBox.classList.add('hidden');
+
+            // Demo mode - check for demo account
+            if (username === DEMO_ACCOUNT.username && password === DEMO_ACCOUNT.password) {
+                localStorage.setItem('token', 'demo-token-12345');
+                localStorage.setItem('username', 'demo');
+                localStorage.setItem('demoMode', 'true');
+                window.location.href = 'home.html';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store token in localStorage
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('username', username);
+                    // Redirect to home page
+                    window.location.href = 'home.html';
+                } else {
+                    // Show error message
+                    alertMessage.textContent = data.message || 'Invalid username or password';
+                    alertBox.classList.remove('hidden');
+                }
+            } catch (error) {
+                alertMessage.textContent = 'An error occurred. Please try again.';
+                alertBox.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

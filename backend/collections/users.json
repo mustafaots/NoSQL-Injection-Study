@@ -1,0 +1,7 @@
+{
+  "_id": ObjectId,
+  "username": String,
+  "password": String,
+  "createdAt": Date,
+  "updatedAt": Date
+}
