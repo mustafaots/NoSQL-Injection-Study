@@ -33,7 +33,19 @@ app.use(cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(mongoSanitize());
+
+// Express 5 exposes req.query as a getter-only property.
+// Use sanitize() directly to mutate request objects in place.
+const sanitizeRequest = (req, res, next) => {
+    ['body', 'params', 'query'].forEach((key) => {
+        if (req[key] && typeof req[key] === 'object') {
+            mongoSanitize.sanitize(req[key]);
+        }
+    });
+    next();
+};
+
+app.use(sanitizeRequest);
 
 const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
