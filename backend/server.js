@@ -4,12 +4,8 @@
  * ============================================================
  *
  * This application is designed for NoSQL Injection case study.
- * It contains INTENTIONAL security vulnerabilities including:
- *
- * 1. No input sanitization on login (allows operator injection)
- * 2. Plain text password storage (no bcrypt hashing)
- * 3. Unsanitized regex search (allows ReDoS)
- * 4. Direct user input in MongoDB queries
+ * It still contains intentionally vulnerable areas for educational testing,
+ * while authentication endpoints now include blue-team defenses.
  *
  * DO NOT deploy this application in production.
  * For educational and research purposes ONLY.
@@ -20,6 +16,8 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const mongoSanitize = require('express-mongo-sanitize');
+const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/auth');
 const notesRoutes = require('./routes/notes');
@@ -33,11 +31,52 @@ connectDB();
 // Middleware
 app.use(cors());
 
-// VULNERABLE: express.json() without limiting or sanitizing input
-// This allows MongoDB operators in JSON body (e.g., {"$gt": ""})
-// to be parsed and passed directly to Mongoose queries
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(mongoSanitize());
+
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,
+    message: { message: 'Too many attempts, please try again later' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+
+const loginSecurityLogger = (req, res, next) => {
+    const { username, password } = req.body || {};
+
+    const payloadShape = {
+        usernameType: Array.isArray(username) ? 'array' : typeof username,
+        passwordType: Array.isArray(password) ? 'array' : typeof password
+    };
+
+    const suspicious = typeof username !== 'string' || typeof password !== 'string';
+
+    if (suspicious) {
+        console.warn('[ALERT] Suspicious login attempt', {
+            timestamp: new Date().toISOString(),
+            ip: req.ip,
+            payloadShape
+        });
+    }
+
+    res.on('finish', () => {
+        if (res.statusCode >= 400) {
+            console.warn('[AUTH-FAIL] Login request failed', {
+                timestamp: new Date().toISOString(),
+                ip: req.ip,
+                statusCode: res.statusCode,
+                payloadShape
+            });
+        }
+    });
+
+    next();
+};
+
+app.use('/api/auth/login', loginSecurityLogger);
+app.use('/api/auth/login', loginLimiter);
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname, '..', 'frontend')));
@@ -58,8 +97,7 @@ app.listen(PORT, () => {
     console.log(`============================================================`);
     console.log(`Server running on: http://localhost:${PORT}`);
     console.log(`MongoDB URI: ${process.env.MONGODB_URI}`);
-    console.log(`\nWARNING: This app is intentionally vulnerable.`);
-    console.log(`For educational purposes ONLY.`);
+    console.log(`\nBlue Team defenses are enabled for auth routes.`);
     console.log(`============================================================\n`);
 });
 

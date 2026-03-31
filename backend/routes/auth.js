@@ -6,6 +6,22 @@ const Session = require('../models/Session');
 
 const router = express.Router();
 
+function logFailedLogin(req, reason) {
+    const { username, password } = req.body || {};
+
+    const payloadShape = {
+        usernameType: Array.isArray(username) ? 'array' : typeof username,
+        passwordType: Array.isArray(password) ? 'array' : typeof password
+    };
+
+    console.warn('[AUTH-FAIL] Invalid login attempt', {
+        timestamp: new Date().toISOString(),
+        ip: req.ip,
+        reason,
+        payloadShape
+    });
+}
+
 /**
  * POST /api/auth/signup
  * Register a new user
@@ -14,14 +30,19 @@ const router = express.Router();
  */
 router.post('/signup', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, password } = req.body || {};
 
-        // Basic validation only - no sanitization (intentionally vulnerable)
-        if (!username || !password) {
+        if (typeof username !== 'string' || typeof password !== 'string') {
+            return res.status(400).json({ message: 'Invalid input' });
+        }
+
+        const normalizedUsername = username.trim();
+
+        if (!normalizedUsername || !password) {
             return res.status(400).json({ message: 'Username and password are required' });
         }
 
-        if (typeof username !== 'string' || username.length < 3 || username.length > 20) {
+        if (normalizedUsername.length < 3 || normalizedUsername.length > 20) {
             return res.status(400).json({ message: 'Username must be 3-20 characters' });
         }
 
@@ -29,9 +50,7 @@ router.post('/signup', async (req, res) => {
             return res.status(400).json({ message: 'Password must be at least 6 characters' });
         }
 
-        // Check if username already exists
-        // VULNERABLE: username is passed directly without sanitization
-        const existingUser = await User.findOne({ username: username });
+        const existingUser = await User.findOne({ username: normalizedUsername });
 
         if (existingUser) {
             return res.status(409).json({ message: 'Username already exists' });
@@ -61,20 +80,21 @@ router.post('/signup', async (req, res) => {
  */
 router.post('/login', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { username, password } = req.body || {};
 
-        if (!username || !password) {
+        if (typeof username !== 'string' || typeof password !== 'string') {
+            logFailedLogin(req, 'invalid_input_type');
+            return res.status(400).json({ message: 'Invalid input' });
+        }
+
+        const normalizedUsername = username.trim();
+
+        if (!normalizedUsername || !password) {
+            logFailedLogin(req, 'missing_credentials');
             return res.status(400).json({ message: 'Username and password are required' });
         }
 
-        // VULNERABLE: Directly passing user input to MongoDB query
-        // No sanitization, no type checking - allows operator injection
-        // An attacker can send { "username": {"$gt": ""}, "password": {"$gt": ""} }
-        // which would match any user with a non-empty username and password
-        const user = await User.findOne({
-            username: username,
-            password: password
-        });
+        const user = await User.findOne({ username: normalizedUsername });
 
         if (!user) {
             logFailedLogin(req, 'invalid_credentials');
