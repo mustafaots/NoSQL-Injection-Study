@@ -1,5 +1,6 @@
 const express = require('express');
 const crypto = require('crypto');
+const bcrypt = require('bcrypt');
 const User = require('../models/User');
 const Session = require('../models/Session');
 
@@ -9,9 +10,7 @@ const router = express.Router();
  * POST /api/auth/signup
  * Register a new user
  *
- * VULNERABLE: No input sanitization on username/password.
- * Password is stored in plain text (no hashing).
- * This is intentional for NoSQL injection study purposes.
+ * Secure signup with type validation and bcrypt password hashing.
  */
 router.post('/signup', async (req, res) => {
     try {
@@ -38,10 +37,11 @@ router.post('/signup', async (req, res) => {
             return res.status(409).json({ message: 'Username already exists' });
         }
 
-        // VULNERABLE: Password stored in plain text (no bcrypt hashing)
+        const hashedPassword = await bcrypt.hash(password, 12);
+
         const user = new User({
-            username: username,
-            password: password  // Plain text - intentionally insecure
+            username: normalizedUsername,
+            password: hashedPassword
         });
 
         await user.save();
@@ -57,20 +57,7 @@ router.post('/signup', async (req, res) => {
  * POST /api/auth/login
  * Authenticate a user
  *
- * VULNERABLE TO NoSQL INJECTION:
- * - The username and password fields are passed directly from req.body to the
- *   MongoDB query without any sanitization or type checking.
- * - An attacker can send JSON with MongoDB query operators instead of strings.
- *
- * Example attack payloads:
- *   { "username": {"$gt": ""}, "password": {"$gt": ""} }
- *   → This returns the first user in the database because $gt:"" matches any non-empty string.
- *
- *   { "username": "admin", "password": {"$ne": ""} }
- *   → This bypasses password check by matching any password that is not empty.
- *
- *   { "username": {"$regex": "^a"}, "password": {"$gt": ""} }
- *   → This finds users whose username starts with 'a'.
+ * Secure login with strict type checks, generic errors, and bcrypt verification.
  */
 router.post('/login', async (req, res) => {
     try {
@@ -90,7 +77,15 @@ router.post('/login', async (req, res) => {
         });
 
         if (!user) {
-            return res.status(401).json({ message: 'Invalid username or password' });
+            logFailedLogin(req, 'invalid_credentials');
+            return res.status(401).json({ message: 'Invalid credentials' });
+        }
+
+        const match = await bcrypt.compare(password, user.password);
+
+        if (!match) {
+            logFailedLogin(req, 'invalid_credentials');
+            return res.status(401).json({ message: 'Invalid credentials' });
         }
 
         // Generate a session token

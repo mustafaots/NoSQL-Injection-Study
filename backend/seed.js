@@ -9,6 +9,7 @@
 
 require('dotenv').config();
 const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 const User = require('./models/User');
 const Note = require('./models/Note');
 const Session = require('./models/Session');
@@ -51,8 +52,15 @@ async function seedDatabase() {
         await Session.deleteMany({});
         console.log('Cleared existing data');
 
-        // Create users (passwords stored in plain text - intentionally insecure)
-        const createdUsers = await User.insertMany(seedUsers);
+        // Create users with bcrypt-hashed passwords
+        const usersToInsert = await Promise.all(
+            seedUsers.map(async (seedUser) => ({
+                username: seedUser.username,
+                password: await bcrypt.hash(seedUser.password, 12)
+            }))
+        );
+
+        const createdUsers = await User.insertMany(usersToInsert);
         console.log(`Created ${createdUsers.length} users:`);
         createdUsers.forEach(user => {
             const originalPassword = seedUsers.find(u => u.username === user.username).password;
@@ -90,7 +98,7 @@ async function seedDatabase() {
         console.log('  student2 / mypassword');
         console.log('  demo     / demo123');
         console.log('  testuser / test1234');
-        console.log('\nPasswords are stored in plain text (intentionally vulnerable)');
+        console.log('\nPasswords are stored as bcrypt hashes');
         console.log('============================================================\n');
 
         process.exit(0);

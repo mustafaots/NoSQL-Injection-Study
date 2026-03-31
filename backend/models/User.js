@@ -10,9 +10,7 @@ const userSchema = new mongoose.Schema({
         maxlength: 20
     },
     password: {
-        // VULNERABLE: Password stored in plain text (no hashing)
-        // This is intentional for NoSQL injection study purposes.
-        // In a secure app, you would use bcrypt to hash passwords.
+        // Passwords are stored as bcrypt hashes.
         type: String,
         required: true,
         minlength: 6
